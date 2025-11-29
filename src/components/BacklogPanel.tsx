@@ -354,7 +354,7 @@ export function BacklogPanel({
           'overflow-hidden transition-all duration-300',
           isExpanded ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'
         )}>
-          <div className="px-4 pb-4 space-y-3">
+          <div className="px-5 pb-5 pt-2 space-y-4">
             {/* Toolbar */}
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-2 flex-1">
@@ -472,10 +472,10 @@ export function BacklogPanel({
                 <TableBody>
                   {filteredAndSortedTasks.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="h-32">
-                        <div className="flex flex-col items-center justify-center py-6">
-                          <div className="w-10 h-10 rounded-full bg-muted/50 flex items-center justify-center mb-3">
-                            <Inbox className="h-5 w-5 text-muted-foreground/50" />
+                      <TableCell colSpan={9} className="h-48">
+                        <div className="flex flex-col items-center justify-center py-8">
+                          <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+                            <Inbox className="h-6 w-6 text-muted-foreground/50" />
                           </div>
                           <p className="text-sm font-medium text-muted-foreground/70">
                             {searchQuery || statusFilter !== 'all'
@@ -675,7 +675,7 @@ export function BacklogPanel({
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
               <span>
                 총 {filteredAndSortedTasks.length}개 이슈
                 {searchQuery || statusFilter !== 'all'
@@ -692,7 +692,7 @@ export function BacklogPanel({
 
         {/* Empty state drop zone */}
         {unassignedTasks.length === 0 && isExpanded && (
-          <div className="px-4 pb-4">
+          <div className="px-5 pb-5">
             <div
               className={cn(
                 'flex flex-col items-center justify-center py-12 rounded-lg border-2 border-dashed transition-all',

@@ -614,7 +614,7 @@ export function SprintDashboard() {
           </div>
         </div>
 
-        <TabsContent value="board" className="mt-4 space-y-4">
+        <TabsContent value="board" className="mt-4 space-y-6">
           {/* Task Filters */}
           <TaskFilters
             filters={taskFilters}
@@ -624,23 +624,34 @@ export function SprintDashboard() {
             assignees={uniqueAssignees}
           />
 
-          {/* Backlog Panel - Show unassigned tasks */}
-          {currentSprintId && (
-            <BacklogPanel
-              tasks={sprintTasks}
-              onTaskClick={handleTaskClick}
-              onTaskAssignToSprint={handleTaskAssignToSprint}
-              currentSprintId={currentSprintId}
-            />
-          )}
-
+          {/* Sprint Board - Show first for better visibility */}
           <SprintBoard
             tasks={filteredTasks}
             onTaskClick={handleTaskClick}
             onStatusChange={handleStatusChange}
             onDeleteTask={handleDeleteTask}
             onTaskDropFromBacklog={currentSprintId ? (taskId) => handleTaskAssignToSprint(taskId, currentSprintId) : undefined}
+            onMoveToBacklog={(taskId) => {
+              setSprintTasks(sprintTasks.map(t =>
+                t.id === taskId ? { ...t, sprintId: undefined } : t
+              ));
+            }}
           />
+
+          {/* Backlog Panel - Show unassigned tasks */}
+          {currentSprintId && (
+            <BacklogPanel
+              tasks={sprintTasks}
+              onTaskClick={handleTaskClick}
+              onTaskAssignToSprint={handleTaskAssignToSprint}
+              onTaskDropFromSprint={(taskId) => {
+                setSprintTasks(sprintTasks.map(t =>
+                  t.id === taskId ? { ...t, sprintId: undefined } : t
+                ));
+              }}
+              currentSprintId={currentSprintId}
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="gantt" className="mt-4">

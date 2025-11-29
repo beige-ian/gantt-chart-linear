@@ -15,7 +15,6 @@ import {
   CheckCircle2,
   Circle,
   Timer,
-  Search as SearchIcon,
   Inbox,
   Copy,
 } from 'lucide-react';
@@ -47,7 +46,7 @@ const STATUS_ICONS: Record<SprintTask['status'], React.ReactNode> = {
   backlog: <Circle className="h-4 w-4 text-status-backlog" />,
   todo: <Circle className="h-4 w-4 text-status-todo" strokeWidth={2.5} />,
   in_progress: <Timer className="h-4 w-4 text-status-in-progress" />,
-  in_review: <SearchIcon className="h-4 w-4 text-status-in-review" />,
+  in_review: <AlertCircle className="h-4 w-4 text-status-in-review" />,
   done: <CheckCircle2 className="h-4 w-4 text-status-done" />,
 };
 
@@ -349,7 +348,7 @@ export function SprintBoard({ tasks, onTaskClick, onStatusChange, onDeleteTask, 
         )}
 
         {/* Kanban Board */}
-        <div className="flex gap-4 overflow-x-auto pb-4 scroll-smooth">
+        <div className="grid grid-cols-5 gap-4 min-w-[1000px]">
           {COLUMNS.map(status => {
             const stats = getColumnStats(status);
             const columnTasks = getTasksByStatus(status);
@@ -359,7 +358,7 @@ export function SprintBoard({ tasks, onTaskClick, onStatusChange, onDeleteTask, 
               <div
                 key={status}
                 data-column={status}
-                className="flex-shrink-0 w-80"
+                className="min-w-0"
                 onDragOver={(e) => handleDragOver(e, status)}
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, status)}

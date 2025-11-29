@@ -2229,15 +2229,21 @@ export function GanttChart({ className }: GanttChartProps) {
                             {/* Second row - Assignee & Meta (only show if there's content) */}
                             {(task.teamIcon || task.assignee || task.cycleName || (task.labels && task.labels.length > 0)) && (
                             <div className="flex items-center gap-1.5 mt-1">
-                              {/* Team Icon - only show if there's an actual emoji/icon */}
-                              {task.teamIcon && task.teamIcon.trim() && (
+                              {/* Team Icon - show emoji if valid, otherwise show icon */}
+                              {task.teamName && (
                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <span className="text-sm flex-shrink-0 cursor-default">
-                                      {task.teamIcon}
+                                    <span className="flex-shrink-0 cursor-default">
+                                      {task.teamIcon && /^\p{Emoji}/u.test(task.teamIcon) ? (
+                                        <span className="text-sm">{task.teamIcon}</span>
+                                      ) : (
+                                        <div className="w-4 h-4 rounded bg-muted flex items-center justify-center">
+                                          <Users className="w-2.5 h-2.5 text-muted-foreground" />
+                                        </div>
+                                      )}
                                     </span>
                                   </TooltipTrigger>
-                                  <TooltipContent>{task.teamName || 'Team'}</TooltipContent>
+                                  <TooltipContent>{task.teamName}</TooltipContent>
                                 </Tooltip>
                               )}
                               {/* Assignee with Avatar */}

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Calendar, MoreHorizontal, ChevronDown, ChevronRight, Edit3, Check, X, Loader2, ZoomIn, ZoomOut, Home, Search, Filter, BarChart3, Undo2, Redo2, Plus, Copy, Layers, GripVertical } from 'lucide-react';
+import { Calendar, MoreHorizontal, ChevronDown, ChevronRight, Edit3, Check, X, Loader2, ZoomIn, ZoomOut, Home, Search, Filter, BarChart3, Undo2, Redo2, Plus, Copy, Layers, GripVertical, Users } from 'lucide-react';
 import { useUndoRedo } from '../hooks/useUndoRedo';
 import { TaskBar } from './TaskBar';
 import { TaskForm } from './TaskForm';

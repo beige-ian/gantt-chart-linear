@@ -3,6 +3,7 @@ import { Card } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Progress } from './ui/progress';
+import { Avatar, AvatarFallback } from './ui/avatar';
 import {
   MoreHorizontal,
   Clock,
@@ -15,6 +16,8 @@ import {
   Circle,
   Timer,
   Search as SearchIcon,
+  Inbox,
+  Copy,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -33,6 +36,7 @@ interface SprintBoardProps {
   onStatusChange: (taskId: string, status: SprintTask['status']) => void;
   onDeleteTask: (taskId: string) => void;
   onTaskDropFromBacklog?: (taskId: string) => void;
+  onMoveToBacklog?: (taskId: string) => void;
 }
 
 const COLUMNS: SprintTask['status'][] = ['backlog', 'todo', 'in_progress', 'in_review', 'done'];
@@ -64,7 +68,7 @@ const STATUS_DOT_COLORS: Record<SprintTask['status'], string> = {
   done: 'var(--status-done)',
 };
 
-export function SprintBoard({ tasks, onTaskClick, onStatusChange, onDeleteTask, onTaskDropFromBacklog }: SprintBoardProps) {
+export function SprintBoard({ tasks, onTaskClick, onStatusChange, onDeleteTask, onTaskDropFromBacklog, onMoveToBacklog }: SprintBoardProps) {
   const [draggedTask, setDraggedTask] = useState<SprintTask | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<SprintTask['status'] | null>(null);
   const [touchStartY, setTouchStartY] = useState<number | null>(null);
@@ -481,8 +485,21 @@ export function SprintBoard({ tasks, onTaskClick, onStatusChange, onDeleteTask, 
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="w-48">
                                   <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onTaskClick(task); }}>
-                                    수정
+                                    상세 보기
                                   </DropdownMenuItem>
+                                  <DropdownMenuItem>
+                                    <Copy className="h-4 w-4 mr-2" />
+                                    복제
+                                  </DropdownMenuItem>
+                                  {onMoveToBacklog && (
+                                    <>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onMoveToBacklog(task.id); }}>
+                                        <Inbox className="h-4 w-4 mr-2" />
+                                        백로그로 이동
+                                      </DropdownMenuItem>
+                                    </>
+                                  )}
                                   <DropdownMenuSeparator />
                                   {COLUMNS.filter(s => s !== status).map(s => (
                                     <DropdownMenuItem
@@ -544,17 +561,19 @@ export function SprintBoard({ tasks, onTaskClick, onStatusChange, onDeleteTask, 
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <div className="flex items-center gap-1.5 text-muted-foreground">
-                                    {task.assigneeAvatarUrl ? (
-                                      <img
-                                        src={task.assigneeAvatarUrl}
-                                        alt={task.assignee}
-                                        className="w-4 h-4 rounded-full object-cover ring-1 ring-border/50"
-                                      />
-                                    ) : (
-                                      <div className="w-4 h-4 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[8px] font-bold">
-                                        {task.assignee.charAt(0).toUpperCase()}
-                                      </div>
-                                    )}
+                                    <Avatar className="h-5 w-5">
+                                      {task.assigneeAvatarUrl ? (
+                                        <img
+                                          src={task.assigneeAvatarUrl}
+                                          alt={task.assignee}
+                                          className="w-full h-full rounded-full object-cover"
+                                        />
+                                      ) : (
+                                        <AvatarFallback className="text-[9px]">
+                                          {task.assignee.slice(0, 2).toUpperCase()}
+                                        </AvatarFallback>
+                                      )}
+                                    </Avatar>
                                     <span className="truncate max-w-[80px]">{task.assignee}</span>
                                   </div>
                                 </TooltipTrigger>

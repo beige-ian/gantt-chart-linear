@@ -65,11 +65,11 @@ type SortField = 'name' | 'status' | 'priority' | 'assignee' | 'endDate' | 'stor
 type SortDirection = 'asc' | 'desc';
 
 const STATUS_ICONS: Record<SprintTask['status'], React.ReactNode> = {
-  backlog: <Circle className="h-4 w-4" style={{ color: '#9b9a97' }} />,
-  todo: <Circle className="h-4 w-4" style={{ color: '#787774' }} strokeWidth={2.5} />,
-  in_progress: <Timer className="h-4 w-4" style={{ color: '#5e6ad2' }} />,
-  in_review: <AlertCircle className="h-4 w-4" style={{ color: '#f2994a' }} />,
-  done: <CheckCircle2 className="h-4 w-4" style={{ color: '#0f783c' }} />,
+  backlog: <Circle className="h-4 w-4 text-status-backlog" />,
+  todo: <Circle className="h-4 w-4 text-status-todo" strokeWidth={2.5} />,
+  in_progress: <Timer className="h-4 w-4 text-status-in-progress" />,
+  in_review: <AlertCircle className="h-4 w-4 text-status-in-review" />,
+  done: <CheckCircle2 className="h-4 w-4 text-status-done" />,
 };
 
 const STATUS_ORDER: SprintTask['status'][] = ['backlog', 'todo', 'in_progress', 'in_review', 'done'];

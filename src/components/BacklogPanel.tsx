@@ -472,10 +472,22 @@ export function BacklogPanel({
                 <TableBody>
                   {filteredAndSortedTasks.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
-                        {searchQuery || statusFilter !== 'all'
-                          ? '검색 결과가 없습니다'
-                          : '미할당 이슈가 없습니다'}
+                      <TableCell colSpan={9} className="h-32">
+                        <div className="flex flex-col items-center justify-center py-6">
+                          <div className="w-10 h-10 rounded-full bg-muted/50 flex items-center justify-center mb-3">
+                            <Inbox className="h-5 w-5 text-muted-foreground/50" />
+                          </div>
+                          <p className="text-sm font-medium text-muted-foreground/70">
+                            {searchQuery || statusFilter !== 'all'
+                              ? '검색 결과가 없습니다'
+                              : '미할당 이슈가 없습니다'}
+                          </p>
+                          <p className="text-xs text-muted-foreground/50 mt-1">
+                            {searchQuery || statusFilter !== 'all'
+                              ? '다른 검색어나 필터를 시도해보세요'
+                              : '스프린트에서 태스크를 드래그하여 이동하세요'}
+                          </p>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -598,8 +610,8 @@ export function BacklogPanel({
                             <span
                               className={cn(
                                 'text-xs',
-                                isOverdue && 'text-red-500 font-medium',
-                                isSoon && !isOverdue && 'text-orange-500'
+                                isOverdue && 'text-priority-urgent font-medium',
+                                isSoon && !isOverdue && 'text-priority-high'
                               )}
                             >
                               {format(task.endDate, 'M/d', { locale: ko })}

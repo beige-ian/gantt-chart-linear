@@ -47,6 +47,7 @@ import {
   Trash2,
   Copy,
   ChevronRight,
+  Inbox,
 } from 'lucide-react';
 import { SprintTask, STATUS_LABELS, PRIORITY_LABELS, PRIORITY_COLORS } from '../types/sprint';
 import { cn } from './ui/utils';
@@ -329,10 +330,22 @@ export function IssueListView({
           <TableBody>
             {filteredAndSortedTasks.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
-                  {searchQuery || statusFilter !== 'all'
-                    ? '검색 결과가 없습니다'
-                    : '이슈가 없습니다'}
+                <TableCell colSpan={9} className="h-48">
+                  <div className="flex flex-col items-center justify-center py-8">
+                    <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+                      <Inbox className="h-6 w-6 text-muted-foreground/50" />
+                    </div>
+                    <p className="text-sm font-medium text-muted-foreground/70">
+                      {searchQuery || statusFilter !== 'all'
+                        ? '검색 결과가 없습니다'
+                        : '이슈가 없습니다'}
+                    </p>
+                    <p className="text-xs text-muted-foreground/50 mt-1">
+                      {searchQuery || statusFilter !== 'all'
+                        ? '다른 검색어나 필터를 시도해보세요'
+                        : '새로운 이슈를 추가해보세요'}
+                    </p>
+                  </div>
                 </TableCell>
               </TableRow>
             ) : (
@@ -441,8 +454,8 @@ export function IssueListView({
                       <span
                         className={cn(
                           'text-xs',
-                          isOverdue && 'text-red-500 font-medium',
-                          isSoon && !isOverdue && 'text-orange-500'
+                          isOverdue && 'text-priority-urgent font-medium',
+                          isSoon && !isOverdue && 'text-priority-high'
                         )}
                       >
                         {format(task.endDate, 'M/d', { locale: ko })}

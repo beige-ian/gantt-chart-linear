@@ -329,17 +329,14 @@ export function SprintBoard({ tasks, onTaskClick, onStatusChange, onDeleteTask, 
                   ))}
                 </div>
               </div>
-              <span className="text-sm font-medium" style={{ color: '#5e6ad2' }}>
+              <span className="text-sm font-medium text-primary">
                 {totalStats.progressPercent}%
               </span>
             </div>
             <div className="h-2 bg-muted rounded-full overflow-hidden">
               <div
-                className="h-full transition-all duration-500 rounded-full"
-                style={{
-                  width: `${totalStats.progressPercent}%`,
-                  background: 'linear-gradient(90deg, #5e6ad2 0%, #0f783c 100%)',
-                }}
+                className="h-full transition-all duration-500 rounded-full bg-gradient-to-r from-primary to-status-done"
+                style={{ width: `${totalStats.progressPercent}%` }}
               />
             </div>
             <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
@@ -374,15 +371,11 @@ export function SprintBoard({ tasks, onTaskClick, onStatusChange, onDeleteTask, 
                     <h3 className="font-medium text-sm text-foreground/90">{STATUS_LABELS[status]}</h3>
                     <Badge
                       variant={stats.count > 0 ? (status === 'done' ? 'default' : 'secondary') : 'outline'}
-                      className={`h-5 min-w-5 px-1.5 text-[10px] font-medium rounded-full transition-all ${
-                        stats.count > 0
-                          ? status === 'done'
-                            ? 'bg-green-500/20 text-green-700 dark:text-green-400 border-green-500/30'
-                            : status === 'in_progress'
-                            ? 'bg-blue-500/20 text-blue-700 dark:text-blue-400 border-blue-500/30'
-                            : ''
-                          : ''
-                      }`}
+                      className={cn(
+                        'h-5 min-w-5 px-1.5 text-[10px] font-medium rounded-full transition-all',
+                        stats.count > 0 && status === 'done' && 'bg-status-done/20 text-status-done border-status-done/30',
+                        stats.count > 0 && status === 'in_progress' && 'bg-status-in-progress/20 text-status-in-progress border-status-in-progress/30'
+                      )}
                     >
                       {stats.count}
                     </Badge>
@@ -552,13 +545,14 @@ export function SprintBoard({ tasks, onTaskClick, onStatusChange, onDeleteTask, 
                           {/* Task Footer */}
                           <div className="mt-2 pl-1 flex items-center justify-between text-xs">
                             <div
-                              className={`flex items-center gap-1 ${
+                              className={cn(
+                                'flex items-center gap-1',
                                 dueInfo.isOverdue
-                                  ? 'text-red-500 font-medium'
+                                  ? 'text-priority-urgent font-medium'
                                   : dueInfo.isSoon
-                                  ? 'text-orange-500'
+                                  ? 'text-priority-high'
                                   : 'text-muted-foreground'
-                              }`}
+                              )}
                             >
                               <Clock className="h-3 w-3" />
                               {dueInfo.text}
@@ -567,7 +561,7 @@ export function SprintBoard({ tasks, onTaskClick, onStatusChange, onDeleteTask, 
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <div className="flex items-center gap-1.5 text-muted-foreground">
-                                    <Avatar className="h-5 w-5">
+                                    <Avatar className="h-6 w-6">
                                       {task.assigneeAvatarUrl ? (
                                         <img
                                           src={task.assigneeAvatarUrl}
@@ -575,7 +569,7 @@ export function SprintBoard({ tasks, onTaskClick, onStatusChange, onDeleteTask, 
                                           className="w-full h-full rounded-full object-cover"
                                         />
                                       ) : (
-                                        <AvatarFallback className="text-[9px]">
+                                        <AvatarFallback className="text-[10px]">
                                           {task.assignee.slice(0, 2).toUpperCase()}
                                         </AvatarFallback>
                                       )}
@@ -592,14 +586,14 @@ export function SprintBoard({ tasks, onTaskClick, onStatusChange, onDeleteTask, 
                           {task.labels && task.labels.length > 0 && (
                             <div className="mt-2 pl-1 flex flex-wrap gap-1">
                               {task.labels.slice(0, 2).map((label, i) => (
-                                <span key={i} className="inline-flex items-center text-[11px] px-1.5 py-0.5 rounded bg-accent text-accent-foreground">
+                                <span key={i} className="inline-flex items-center text-[10px] px-1.5 py-0.5 rounded bg-accent text-accent-foreground">
                                   {label}
                                 </span>
                               ))}
                               {task.labels.length > 2 && (
                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <span className="inline-flex items-center text-[11px] px-1.5 py-0.5 rounded bg-accent text-muted-foreground cursor-help">
+                                    <span className="inline-flex items-center text-[10px] px-1.5 py-0.5 rounded bg-accent text-muted-foreground cursor-help">
                                       +{task.labels.length - 2}
                                     </span>
                                   </TooltipTrigger>
@@ -656,7 +650,7 @@ export function SprintBoard({ tasks, onTaskClick, onStatusChange, onDeleteTask, 
 
         {/* Keyboard shortcut hint - Notion style */}
         {tasks.length > 0 && (
-          <div className="text-[11px] text-muted-foreground/70 text-center pt-3">
+          <div className="text-[10px] text-muted-foreground/70 text-center pt-3">
             <span className="hidden md:inline">
               태스크 선택 후 <kbd className="px-1 py-0.5 bg-muted/50 rounded text-[10px] font-mono">←</kbd>{' '}
               <kbd className="px-1 py-0.5 bg-muted/50 rounded text-[10px] font-mono">→</kbd> 키로 상태 변경

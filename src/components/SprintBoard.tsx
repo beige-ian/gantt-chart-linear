@@ -32,6 +32,7 @@ interface SprintBoardProps {
   onTaskClick: (task: SprintTask) => void;
   onStatusChange: (taskId: string, status: SprintTask['status']) => void;
   onDeleteTask: (taskId: string) => void;
+  onTaskDropFromBacklog?: (taskId: string) => void;
 }
 
 const COLUMNS: SprintTask['status'][] = ['backlog', 'todo', 'in_progress', 'in_review', 'done'];
@@ -63,7 +64,7 @@ const STATUS_DOT_COLORS: Record<SprintTask['status'], string> = {
   done: 'var(--status-done)',
 };
 
-export function SprintBoard({ tasks, onTaskClick, onStatusChange, onDeleteTask }: SprintBoardProps) {
+export function SprintBoard({ tasks, onTaskClick, onStatusChange, onDeleteTask, onTaskDropFromBacklog }: SprintBoardProps) {
   const [draggedTask, setDraggedTask] = useState<SprintTask | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<SprintTask['status'] | null>(null);
   const [touchStartY, setTouchStartY] = useState<number | null>(null);
@@ -166,6 +167,22 @@ export function SprintBoard({ tasks, onTaskClick, onStatusChange, onDeleteTask }
 
   const handleDrop = (e: React.DragEvent, status: SprintTask['status']) => {
     e.preventDefault();
+
+    // Check if this is a drop from the backlog panel
+    try {
+      const dataStr = e.dataTransfer.getData('application/json');
+      if (dataStr) {
+        const data = JSON.parse(dataStr);
+        if (data.source === 'backlog' && data.taskId && onTaskDropFromBacklog) {
+          onTaskDropFromBacklog(data.taskId);
+          setDragOverColumn(null);
+          return;
+        }
+      }
+    } catch (err) {
+      // Not JSON data, continue with normal drop
+    }
+
     if (draggedTask && draggedTask.status !== status) {
       onStatusChange(draggedTask.id, status);
     }

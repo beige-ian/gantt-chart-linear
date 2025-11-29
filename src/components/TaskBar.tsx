@@ -332,12 +332,24 @@ export function TaskBar({
     };
   };
 
+  // Get dynamic drag styles
+  const getDragAnimationStyle = () => {
+    if (!isActive) return {};
+    return {
+      transition: 'transform 0.1s cubic-bezier(0.25, 0.46, 0.45, 0.94), box-shadow 0.2s ease-out',
+      transform: `scale(1.03) ${isDragging ? 'rotate(0.5deg)' : isResizingLeft ? 'rotate(-0.3deg)' : isResizingRight ? 'rotate(0.3deg)' : ''}`,
+    };
+  };
+
   const taskBarElement = (
     <div
-      className={`absolute ${barHeight} ${barRadius} task-bar group/bar transition-all duration-200 ease-out ${
+      className={`absolute ${barHeight} ${barRadius} task-bar group/bar ${
         isSubtask ? 'opacity-90' : ''
-      } ${isActive ? 'z-30 scale-[1.02]' : 'hover:scale-[1.01]'} ${onDateChange ? 'cursor-grab active:cursor-grabbing' : ''}`}
-      style={getBarStyle()}
+      } ${isActive
+        ? 'z-30 shadow-xl ring-2 ring-primary/30'
+        : 'transition-all duration-200 ease-out hover:scale-[1.01] hover:shadow-lg'
+      } ${onDateChange ? 'cursor-grab active:cursor-grabbing' : ''}`}
+      style={{ ...getBarStyle(), ...getDragAnimationStyle() }}
       role="slider"
       aria-label={`${task.name} progress control`}
       aria-valuenow={task.progress}

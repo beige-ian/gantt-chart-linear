@@ -16,6 +16,7 @@ import { GanttChart, Task } from './GanttChart';
 import { LinearSprintSync } from './LinearSprintSync';
 import { LinearRealtimeSync } from './LinearRealtimeSync';
 import { LinearCycleManager } from './LinearCycleManager';
+import { BacklogPanel } from './BacklogPanel';
 import { VelocityChart } from './VelocityChart';
 import { DataExport } from './DataExport';
 import { DataImport } from './DataImport';
@@ -358,6 +359,36 @@ export function SprintDashboard() {
     setSprintTasks([...sprintTasks, ...newTasks]);
   };
 
+  // Assign task to sprint
+  const handleTaskAssignToSprint = async (taskId: string, sprintId: string) => {
+    const task = sprintTasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    // Update local state
+    setSprintTasks(sprintTasks.map(t =>
+      t.id === taskId ? { ...t, sprintId } : t
+    ));
+
+    // Find the sprint's linkedCycleId to update Linear
+    const sprint = sprints.find(s => s.id === sprintId);
+    if (sprint?.linearCycleId && task.linearIssueId) {
+      const apiKey = localStorage.getItem('linear-api-key');
+      if (apiKey) {
+        try {
+          const { updateLinearIssueExtended } = await import('../services/linear');
+          await updateLinearIssueExtended(apiKey, task.linearIssueId, {
+            cycleId: sprint.linearCycleId,
+          });
+          toast.success('Linear 동기화 완료', { description: '스프린트에 추가됨' });
+        } catch (error) {
+          console.error('Failed to sync with Linear:', error);
+        }
+      }
+    } else {
+      toast.success('스프린트에 추가됨', { description: task.name });
+    }
+  };
+
   const handleLinkSprint = (sprintId: string, linearCycleId: string) => {
     setSprints(sprints.map(s =>
       s.id === sprintId ? { ...s, linearCycleId } : s
@@ -592,11 +623,23 @@ export function SprintDashboard() {
             onSortChange={setTaskSort}
             assignees={uniqueAssignees}
           />
+
+          {/* Backlog Panel - Show unassigned tasks */}
+          {currentSprintId && (
+            <BacklogPanel
+              tasks={sprintTasks}
+              onTaskClick={handleTaskClick}
+              onTaskAssignToSprint={handleTaskAssignToSprint}
+              currentSprintId={currentSprintId}
+            />
+          )}
+
           <SprintBoard
             tasks={filteredTasks}
             onTaskClick={handleTaskClick}
             onStatusChange={handleStatusChange}
             onDeleteTask={handleDeleteTask}
+            onTaskDropFromBacklog={currentSprintId ? (taskId) => handleTaskAssignToSprint(taskId, currentSprintId) : undefined}
           />
         </TabsContent>
 

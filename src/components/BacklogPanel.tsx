@@ -1,18 +1,28 @@
 import React, { useState, useMemo } from 'react';
-import { Card } from './ui/card';
+import { format } from 'date-fns';
+import { ko } from 'date-fns/locale';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from './ui/table';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
+import { Avatar, AvatarFallback } from './ui/avatar';
 import { Input } from './ui/input';
 import {
   ChevronRight,
   Search,
   Inbox,
-  GripVertical,
   ArrowUpRight,
-  Clock,
-  AlertCircle,
+  ChevronUp,
+  ChevronDown,
+  ArrowUpDown,
 } from 'lucide-react';
-import { SprintTask, PRIORITY_COLORS, PRIORITY_LABELS } from '../types/sprint';
+import { SprintTask, STATUS_LABELS, PRIORITY_COLORS } from '../types/sprint';
 import { cn } from './ui/utils';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from './ui/tooltip';
 import { PriorityBadge } from './ui/status-badge';
@@ -24,6 +34,11 @@ interface BacklogPanelProps {
   currentSprintId?: string;
 }
 
+type SortField = 'name' | 'priority' | 'assignee' | 'endDate' | 'storyPoints';
+type SortDirection = 'asc' | 'desc';
+
+const PRIORITY_ORDER: SprintTask['priority'][] = ['urgent', 'high', 'medium', 'low', 'none'];
+
 export function BacklogPanel({
   tasks,
   onTaskClick,
@@ -32,6 +47,8 @@ export function BacklogPanel({
 }: BacklogPanelProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortField, setSortField] = useState<SortField>('endDate');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
 
   // Filter unassigned tasks (no sprintId)
@@ -39,22 +56,59 @@ export function BacklogPanel({
     return tasks.filter(task => !task.sprintId);
   }, [tasks]);
 
-  // Apply search filter
-  const filteredTasks = useMemo(() => {
-    if (!searchQuery.trim()) return unassignedTasks;
-    const query = searchQuery.toLowerCase();
-    return unassignedTasks.filter(
-      task =>
+  // Filter and sort tasks
+  const filteredAndSortedTasks = useMemo(() => {
+    let filtered = unassignedTasks;
+
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(task =>
         task.name.toLowerCase().includes(query) ||
-        task.assignee?.toLowerCase().includes(query) ||
-        task.description?.toLowerCase().includes(query)
-    );
-  }, [unassignedTasks, searchQuery]);
+        task.description?.toLowerCase().includes(query) ||
+        task.assignee?.toLowerCase().includes(query)
+      );
+    }
+
+    // Sort
+    return [...filtered].sort((a, b) => {
+      let comparison = 0;
+
+      switch (sortField) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name);
+          break;
+        case 'priority':
+          comparison = PRIORITY_ORDER.indexOf(a.priority) - PRIORITY_ORDER.indexOf(b.priority);
+          break;
+        case 'assignee':
+          comparison = (a.assignee || '').localeCompare(b.assignee || '');
+          break;
+        case 'endDate':
+          comparison = new Date(a.endDate).getTime() - new Date(b.endDate).getTime();
+          break;
+        case 'storyPoints':
+          comparison = (a.storyPoints || 0) - (b.storyPoints || 0);
+          break;
+      }
+
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+  }, [unassignedTasks, searchQuery, sortField, sortDirection]);
 
   // Calculate total story points
   const totalPoints = useMemo(() => {
     return unassignedTasks.reduce((acc, t) => acc + (t.storyPoints || 0), 0);
   }, [unassignedTasks]);
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
 
   const handleDragStart = (e: React.DragEvent, task: SprintTask) => {
     e.dataTransfer.setData('application/json', JSON.stringify({
@@ -76,12 +130,39 @@ export function BacklogPanel({
     }
   };
 
-  const getPriorityIcon = (priority: SprintTask['priority']) => {
-    if (priority === 'urgent' || priority === 'high') {
-      return <AlertCircle className="h-3.5 w-3.5" style={{ color: PRIORITY_COLORS[priority] }} />;
-    }
-    return null;
+  const getDaysRemaining = (endDate: Date) => {
+    const diff = new Date(endDate).getTime() - Date.now();
+    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+    return days;
   };
+
+  const SortableHeader = ({
+    field,
+    children,
+    className,
+  }: {
+    field: SortField;
+    children: React.ReactNode;
+    className?: string;
+  }) => (
+    <TableHead
+      className={cn('cursor-pointer hover:bg-accent/50 select-none', className)}
+      onClick={() => handleSort(field)}
+    >
+      <div className="flex items-center gap-1">
+        {children}
+        {sortField === field ? (
+          sortDirection === 'asc' ? (
+            <ChevronUp className="h-3 w-3" />
+          ) : (
+            <ChevronDown className="h-3 w-3" />
+          )
+        ) : (
+          <ArrowUpDown className="h-3 w-3 opacity-30" />
+        )}
+      </div>
+    </TableHead>
+  );
 
   if (unassignedTasks.length === 0) {
     return null;
@@ -105,27 +186,21 @@ export function BacklogPanel({
           )}
         >
           <div className="flex items-center gap-3">
-            {/* Expand Icon */}
             <ChevronRight className={cn(
               'h-4 w-4 text-muted-foreground transition-transform duration-200',
               isExpanded && 'rotate-90'
             )} />
-
-            {/* Title Section */}
             <div className="flex items-center gap-2">
               <Inbox className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm font-medium text-foreground">
                 미할당 백로그
               </span>
             </div>
-
-            {/* Count Badge */}
             <Badge variant="secondary" className="h-5 min-w-5 px-1.5 text-[10px] font-medium rounded-full">
               {unassignedTasks.length}
             </Badge>
           </div>
 
-          {/* Right Side Stats */}
           <div className="flex items-center gap-3">
             {totalPoints > 0 && (
               <Badge variant="outline" className="h-5 text-[10px] font-normal">
@@ -138,153 +213,177 @@ export function BacklogPanel({
         {/* Content */}
         <div className={cn(
           'overflow-hidden transition-all duration-300',
-          isExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
+          isExpanded ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'
         )}>
           <div className="px-4 pb-4 space-y-3">
             {/* Search Bar */}
-            <div className="relative">
+            <div className="relative max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="태스크 검색..."
+                placeholder="이슈 검색..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 h-9 text-sm bg-background"
+                className="pl-9 h-9"
               />
             </div>
 
-            {/* Task List */}
-            <div className="space-y-2 max-h-[340px] overflow-y-auto">
-              {filteredTasks.map((task) => {
-                const isDragging = draggedTaskId === task.id;
+            {/* Table */}
+            <div className="rounded-lg border bg-card max-h-[400px] overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="w-10"></TableHead>
+                    <SortableHeader field="name" className="min-w-[200px]">
+                      이슈
+                    </SortableHeader>
+                    <SortableHeader field="priority" className="w-[100px]">
+                      우선순위
+                    </SortableHeader>
+                    <SortableHeader field="assignee" className="w-[120px]">
+                      담당자
+                    </SortableHeader>
+                    <SortableHeader field="endDate" className="w-[100px]">
+                      마감일
+                    </SortableHeader>
+                    <SortableHeader field="storyPoints" className="w-[80px]">
+                      포인트
+                    </SortableHeader>
+                    {currentSprintId && <TableHead className="w-10"></TableHead>}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredAndSortedTasks.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={currentSprintId ? 7 : 6} className="h-24 text-center text-muted-foreground">
+                        {searchQuery ? '검색 결과가 없습니다' : '미할당 이슈가 없습니다'}
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredAndSortedTasks.map((task) => {
+                      const daysRemaining = getDaysRemaining(task.endDate);
+                      const isOverdue = daysRemaining < 0;
+                      const isSoon = daysRemaining >= 0 && daysRemaining <= 3;
+                      const isDragging = draggedTaskId === task.id;
 
-                return (
-                  <Card
-                    key={task.id}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, task)}
-                    onDragEnd={handleDragEnd}
-                    onClick={() => onTaskClick(task)}
-                    className={cn(
-                      'group relative p-3 cursor-pointer transition-all duration-150',
-                      'bg-card hover:bg-accent/50 border-border/50',
-                      'hover:border-border hover:shadow-sm',
-                      isDragging && 'opacity-50 scale-[0.98] rotate-1 shadow-lg'
-                    )}
-                  >
-                    {/* Color indicator - Linear style */}
-                    <div
-                      className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full"
-                      style={{ backgroundColor: task.color }}
-                    />
-
-                    {/* Drag handle (visible on hover) */}
-                    <div className="absolute -left-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-40 hover:!opacity-70 transition-opacity cursor-grab">
-                      <GripVertical className="h-4 w-4 text-muted-foreground" />
-                    </div>
-
-                    {/* Task Header */}
-                    <div className="flex items-start justify-between gap-2 pl-1">
-                      <div className="flex items-start gap-2 flex-1 min-w-0">
-                        {getPriorityIcon(task.priority)}
-                        <span className="font-medium text-sm line-clamp-2 leading-tight">
-                          {task.name}
-                        </span>
-                      </div>
-
-                      {/* Quick Add Button */}
-                      {currentSprintId && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => handleQuickAdd(task.id, e)}
-                              className="h-6 w-6 p-0 opacity-0 group-hover:opacity-60 hover:!opacity-100 hover:bg-accent transition-all rounded"
-                            >
-                              <ArrowUpRight className="h-3.5 w-3.5" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent side="left">
-                            스프린트에 추가
-                          </TooltipContent>
-                        </Tooltip>
-                      )}
-                    </div>
-
-                    {/* Task Meta - Notion style inline tags */}
-                    <div className="mt-2 pl-1 flex items-center gap-1.5 flex-wrap">
-                      {task.storyPoints !== undefined && task.storyPoints > 0 && (
-                        <span className="inline-flex items-center text-[10px] px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground font-medium">
-                          {task.storyPoints} pts
-                        </span>
-                      )}
-                      {task.priority !== 'none' && (
-                        <PriorityBadge priority={task.priority} size="sm" />
-                      )}
-                    </div>
-
-                    {/* Task Footer */}
-                    <div className="mt-2 pl-1 flex items-center justify-between text-xs">
-                      {/* Assignee */}
-                      {task.assignee && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div className="flex items-center gap-1.5 text-muted-foreground">
-                              {task.assigneeAvatarUrl ? (
-                                <img
-                                  src={task.assigneeAvatarUrl}
-                                  alt={task.assignee}
-                                  className="w-4 h-4 rounded-full object-cover ring-1 ring-border/50"
-                                />
-                              ) : (
-                                <div className="w-4 h-4 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[8px] font-bold">
-                                  {task.assignee.charAt(0).toUpperCase()}
-                                </div>
-                              )}
-                              <span className="truncate max-w-[80px]">{task.assignee}</span>
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent>{task.assignee}</TooltipContent>
-                        </Tooltip>
-                      )}
-
-                      {/* Labels */}
-                      {task.labels && task.labels.length > 0 && (
-                        <div className="flex items-center gap-1">
-                          {task.labels.slice(0, 2).map((label, idx) => (
-                            <span
-                              key={idx}
-                              className="inline-flex items-center text-[10px] px-1.5 py-0.5 rounded bg-accent text-accent-foreground"
-                            >
-                              {typeof label === 'object' ? label.name : label}
-                            </span>
-                          ))}
-                          {task.labels.length > 2 && (
-                            <span className="text-muted-foreground text-[10px]">
-                              +{task.labels.length - 2}
-                            </span>
+                      return (
+                        <TableRow
+                          key={task.id}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, task)}
+                          onDragEnd={handleDragEnd}
+                          className={cn(
+                            'cursor-pointer group',
+                            isDragging && 'opacity-50'
                           )}
-                        </div>
-                      )}
-                    </div>
-                  </Card>
-                );
-              })}
-
-              {/* Empty Search State */}
-              {filteredTasks.length === 0 && searchQuery && (
-                <div className="text-center text-sm py-8 text-muted-foreground/60">
-                  검색 결과 없음
-                </div>
-              )}
+                          onClick={() => onTaskClick(task)}
+                        >
+                          <TableCell>
+                            <div
+                              className="w-1.5 h-6 rounded-full"
+                              style={{ backgroundColor: task.color }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium truncate">{task.name}</span>
+                              {task.linearIssueId && (
+                                <Badge variant="outline" className="text-[10px] shrink-0">
+                                  Linear
+                                </Badge>
+                              )}
+                            </div>
+                            {task.labels && task.labels.length > 0 && (
+                              <div className="flex gap-1 mt-1">
+                                {task.labels.slice(0, 2).map((label, i) => (
+                                  <span
+                                    key={i}
+                                    className="text-[10px] px-1.5 py-0.5 rounded bg-accent text-muted-foreground"
+                                  >
+                                    {typeof label === 'object' ? label.name : label}
+                                  </span>
+                                ))}
+                                {task.labels.length > 2 && (
+                                  <span className="text-[10px] text-muted-foreground">
+                                    +{task.labels.length - 2}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <PriorityBadge priority={task.priority} size="sm" />
+                          </TableCell>
+                          <TableCell>
+                            {task.assignee ? (
+                              <div className="flex items-center gap-2">
+                                <Avatar className="h-6 w-6">
+                                  <AvatarFallback className="text-[10px]">
+                                    {task.assignee.slice(0, 2).toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <span className="text-xs truncate hidden sm:inline">
+                                  {task.assignee}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <span
+                              className={cn(
+                                'text-xs',
+                                isOverdue && 'text-red-500 font-medium',
+                                isSoon && !isOverdue && 'text-orange-500'
+                              )}
+                            >
+                              {format(task.endDate, 'M/d', { locale: ko })}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            {task.storyPoints !== undefined && task.storyPoints > 0 ? (
+                              <span className="text-xs text-muted-foreground">
+                                {task.storyPoints}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground/50">-</span>
+                            )}
+                          </TableCell>
+                          {currentSprintId && (
+                            <TableCell onClick={(e) => e.stopPropagation()}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 opacity-0 group-hover:opacity-100"
+                                    onClick={(e) => handleQuickAdd(task.id, e)}
+                                  >
+                                    <ArrowUpRight className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>스프린트에 추가</TooltipContent>
+                              </Tooltip>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
             </div>
 
-            {/* Footer Hint */}
-            {filteredTasks.length > 0 && currentSprintId && (
-              <div className="text-[11px] text-muted-foreground/70 text-center pt-2">
-                드래그하거나 <ArrowUpRight className="inline h-3 w-3" /> 버튼으로 스프린트에 추가
-              </div>
-            )}
+            {/* Footer */}
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>
+                총 {filteredAndSortedTasks.length}개 이슈
+                {searchQuery ? ` (전체 ${unassignedTasks.length}개 중)` : ''}
+              </span>
+              {currentSprintId && (
+                <span>드래그하여 스프린트에 추가</span>
+              )}
+            </div>
           </div>
         </div>
       </div>

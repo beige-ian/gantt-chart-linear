@@ -39,7 +39,7 @@ interface SprintBoardProps {
   onMoveToBacklog?: (taskId: string) => void;
 }
 
-const COLUMNS: SprintTask['status'][] = ['backlog', 'todo', 'in_progress', 'in_review', 'done'];
+const COLUMNS: SprintTask['status'][] = ['todo', 'in_progress', 'in_review', 'done'];
 
 // Status icons with semantic colors from design tokens
 const STATUS_ICONS: Record<SprintTask['status'], React.ReactNode> = {
@@ -348,7 +348,7 @@ export function SprintBoard({ tasks, onTaskClick, onStatusChange, onDeleteTask, 
         )}
 
         {/* Kanban Board */}
-        <div className="grid grid-cols-5 gap-4 min-w-[1000px]">
+        <div className="grid grid-cols-4 gap-4">
           {COLUMNS.map(status => {
             const stats = getColumnStats(status);
             const columnTasks = getTasksByStatus(status);

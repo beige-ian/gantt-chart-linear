@@ -54,6 +54,7 @@ interface BacklogPanelProps {
   tasks: SprintTask[];
   onTaskClick: (task: SprintTask) => void;
   onTaskAssignToSprint: (taskId: string, sprintId: string) => void;
+  onTaskDropFromSprint?: (taskId: string) => void;
   onStatusChange?: (taskId: string, status: SprintTask['status']) => void;
   onDeleteTask?: (taskId: string) => void;
   onBulkDelete?: (taskIds: string[]) => void;
@@ -79,6 +80,7 @@ export function BacklogPanel({
   tasks,
   onTaskClick,
   onTaskAssignToSprint,
+  onTaskDropFromSprint,
   onStatusChange,
   onDeleteTask,
   onBulkDelete,
@@ -92,6 +94,7 @@ export function BacklogPanel({
   const [statusFilter, setStatusFilter] = useState<SprintTask['status'] | 'all'>('all');
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   // Filter unassigned tasks (no sprintId)
   const unassignedTasks = useMemo(() => {
@@ -207,6 +210,49 @@ export function BacklogPanel({
     setDraggedTaskId(null);
   };
 
+  // Handle drop from sprint to backlog
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    if (
+      e.clientX < rect.left ||
+      e.clientX > rect.right ||
+      e.clientY < rect.top ||
+      e.clientY > rect.bottom
+    ) {
+      setIsDragOver(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+
+    try {
+      const dataStr = e.dataTransfer.getData('application/json');
+      if (dataStr) {
+        const data = JSON.parse(dataStr);
+        if (data.source === 'sprint' && data.taskId && onTaskDropFromSprint) {
+          onTaskDropFromSprint(data.taskId);
+          return;
+        }
+      }
+    } catch (err) {
+      // Not JSON data, try plain text
+    }
+
+    // Try plain text (taskId from SprintBoard)
+    const taskId = e.dataTransfer.getData('text/plain');
+    if (taskId && onTaskDropFromSprint) {
+      onTaskDropFromSprint(taskId);
+    }
+  };
+
   const handleQuickAdd = (taskId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (currentSprintId) {
@@ -248,17 +294,26 @@ export function BacklogPanel({
     </TableHead>
   );
 
-  if (unassignedTasks.length === 0) {
+  // Always show if there's a drop handler (can receive drops from sprint)
+  const showPanel = unassignedTasks.length > 0 || onTaskDropFromSprint;
+
+  if (!showPanel) {
     return null;
   }
 
   return (
     <TooltipProvider>
-      <div className={cn(
-        'bg-secondary/50 rounded-lg border border-border',
-        'transition-all duration-300',
-        isExpanded ? 'mb-4' : 'mb-3'
-      )}>
+      <div
+        className={cn(
+          'bg-secondary/50 rounded-lg border border-border',
+          'transition-all duration-300',
+          isExpanded ? 'mb-4' : 'mb-3',
+          isDragOver && 'ring-2 ring-primary/50 border-primary/50 bg-primary/5'
+        )}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
         {/* Header */}
         <button
           onClick={() => setIsExpanded(!isExpanded)}
@@ -622,6 +677,31 @@ export function BacklogPanel({
             </div>
           </div>
         </div>
+
+        {/* Empty state drop zone */}
+        {unassignedTasks.length === 0 && isExpanded && (
+          <div className="px-4 pb-4">
+            <div
+              className={cn(
+                'flex flex-col items-center justify-center py-12 rounded-lg border-2 border-dashed transition-all',
+                isDragOver
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-border/50 text-muted-foreground'
+              )}
+            >
+              <Inbox className={cn(
+                'h-10 w-10 mb-3 transition-transform',
+                isDragOver && 'scale-110'
+              )} />
+              <p className="text-sm font-medium">
+                {isDragOver ? '여기에 놓으세요' : '백로그가 비어있습니다'}
+              </p>
+              <p className="text-xs mt-1 opacity-70">
+                {isDragOver ? '태스크를 백로그로 이동합니다' : '스프린트에서 태스크를 드래그하여 이동하세요'}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </TooltipProvider>
   );

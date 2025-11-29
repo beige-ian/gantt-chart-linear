@@ -29,6 +29,7 @@ import {
 import { SprintTask, STATUS_LABELS, PRIORITY_COLORS, PRIORITY_LABELS } from '../types/sprint';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import { PriorityBadge } from './ui/status-badge';
+import { cn } from './ui/utils';
 
 interface SprintBoardProps {
   tasks: SprintTask[];
@@ -137,6 +138,11 @@ export function SprintBoard({ tasks, onTaskClick, onStatusChange, onDeleteTask, 
     setDraggedTask(task);
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', task.id);
+    // Also set JSON data for cross-component communication
+    e.dataTransfer.setData('application/json', JSON.stringify({
+      taskId: task.id,
+      source: 'sprint',
+    }));
 
     // Add drag image
     const dragElement = e.currentTarget as HTMLElement;
@@ -609,12 +615,36 @@ export function SprintBoard({ tasks, onTaskClick, onStatusChange, onDeleteTask, 
                     })}
 
                     {columnTasks.length === 0 && (
-                      <div className={`text-center text-sm py-8 rounded-lg transition-all ${
-                        isDropTarget
-                          ? 'bg-primary/10 border-2 border-dashed border-primary/40 text-primary font-medium'
-                          : 'text-muted-foreground/60'
-                      }`}>
-                        {isDropTarget ? '여기에 놓으세요' : '태스크 없음'}
+                      <div
+                        className={cn(
+                          'flex flex-col items-center justify-center py-10 rounded-lg transition-all',
+                          isDropTarget
+                            ? 'bg-primary/10 border-2 border-dashed border-primary/40'
+                            : 'border border-dashed border-border/40'
+                        )}
+                      >
+                        <div
+                          className={cn(
+                            'w-10 h-10 rounded-full flex items-center justify-center mb-3 transition-all',
+                            isDropTarget
+                              ? 'bg-primary/20 text-primary'
+                              : 'bg-muted/50 text-muted-foreground/50'
+                          )}
+                        >
+                          {STATUS_ICONS[status]}
+                        </div>
+                        <p className={cn(
+                          'text-sm font-medium transition-colors',
+                          isDropTarget ? 'text-primary' : 'text-muted-foreground/60'
+                        )}>
+                          {isDropTarget ? '여기에 놓으세요' : STATUS_LABELS[status]}
+                        </p>
+                        <p className={cn(
+                          'text-xs mt-1 transition-colors',
+                          isDropTarget ? 'text-primary/70' : 'text-muted-foreground/40'
+                        )}>
+                          {isDropTarget ? '태스크를 이동합니다' : '드래그하여 추가'}
+                        </p>
                       </div>
                     )}
                   </div>

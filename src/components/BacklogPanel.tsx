@@ -1,36 +1,96 @@
 import React, { useState, useMemo } from 'react';
-import { Card } from './ui/card';
+import { format } from 'date-fns';
+import { ko } from 'date-fns/locale';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from './ui/table';
+import { Checkbox } from './ui/checkbox';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
+import { Avatar, AvatarFallback } from './ui/avatar';
 import { Input } from './ui/input';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select';
+import {
   ChevronRight,
-  ChevronDown,
   Search,
   Inbox,
-  GripVertical,
-  Plus,
+  ArrowUpRight,
+  ChevronUp,
+  ChevronDown,
+  ArrowUpDown,
   Filter,
+  MoreHorizontal,
+  Trash2,
+  Copy,
+  Circle,
+  Timer,
+  AlertCircle,
+  CheckCircle2,
 } from 'lucide-react';
-import { SprintTask, PRIORITY_LABELS } from '../types/sprint';
-import { PriorityBadge } from './ui/status-badge';
+import { SprintTask, STATUS_LABELS, PRIORITY_COLORS } from '../types/sprint';
 import { cn } from './ui/utils';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from './ui/tooltip';
+import { PriorityBadge } from './ui/status-badge';
 
 interface BacklogPanelProps {
   tasks: SprintTask[];
   onTaskClick: (task: SprintTask) => void;
   onTaskAssignToSprint: (taskId: string, sprintId: string) => void;
+  onStatusChange?: (taskId: string, status: SprintTask['status']) => void;
+  onDeleteTask?: (taskId: string) => void;
+  onBulkDelete?: (taskIds: string[]) => void;
+  onBulkStatusChange?: (taskIds: string[], status: SprintTask['status']) => void;
   currentSprintId?: string;
 }
+
+type SortField = 'name' | 'status' | 'priority' | 'assignee' | 'endDate' | 'storyPoints';
+type SortDirection = 'asc' | 'desc';
+
+const PRIORITY_ORDER: SprintTask['priority'][] = ['urgent', 'high', 'medium', 'low', 'none'];
+const STATUS_ORDER: SprintTask['status'][] = ['backlog', 'todo', 'in_progress', 'in_review', 'done'];
+
+const STATUS_ICONS: Record<SprintTask['status'], React.ReactNode> = {
+  backlog: <Circle className="h-4 w-4" style={{ color: '#9b9a97' }} />,
+  todo: <Circle className="h-4 w-4" style={{ color: '#787774' }} strokeWidth={2.5} />,
+  in_progress: <Timer className="h-4 w-4" style={{ color: '#5e6ad2' }} />,
+  in_review: <AlertCircle className="h-4 w-4" style={{ color: '#f2994a' }} />,
+  done: <CheckCircle2 className="h-4 w-4" style={{ color: '#0f783c' }} />,
+};
 
 export function BacklogPanel({
   tasks,
   onTaskClick,
   onTaskAssignToSprint,
+  onStatusChange,
+  onDeleteTask,
+  onBulkDelete,
+  onBulkStatusChange,
   currentSprintId,
 }: BacklogPanelProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortField, setSortField] = useState<SortField>('endDate');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [statusFilter, setStatusFilter] = useState<SprintTask['status'] | 'all'>('all');
+  const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
 
   // Filter unassigned tasks (no sprintId)
@@ -38,17 +98,101 @@ export function BacklogPanel({
     return tasks.filter(task => !task.sprintId);
   }, [tasks]);
 
-  // Apply search filter
-  const filteredTasks = useMemo(() => {
-    if (!searchQuery.trim()) return unassignedTasks;
-    const query = searchQuery.toLowerCase();
-    return unassignedTasks.filter(
-      task =>
+  // Filter and sort tasks
+  const filteredAndSortedTasks = useMemo(() => {
+    let filtered = unassignedTasks;
+
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(task =>
         task.name.toLowerCase().includes(query) ||
-        task.assignee?.toLowerCase().includes(query) ||
-        task.description?.toLowerCase().includes(query)
-    );
-  }, [unassignedTasks, searchQuery]);
+        task.description?.toLowerCase().includes(query) ||
+        task.assignee?.toLowerCase().includes(query)
+      );
+    }
+
+    // Status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(task => task.status === statusFilter);
+    }
+
+    // Sort
+    return [...filtered].sort((a, b) => {
+      let comparison = 0;
+
+      switch (sortField) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name);
+          break;
+        case 'status':
+          comparison = STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status);
+          break;
+        case 'priority':
+          comparison = PRIORITY_ORDER.indexOf(a.priority) - PRIORITY_ORDER.indexOf(b.priority);
+          break;
+        case 'assignee':
+          comparison = (a.assignee || '').localeCompare(b.assignee || '');
+          break;
+        case 'endDate':
+          comparison = new Date(a.endDate).getTime() - new Date(b.endDate).getTime();
+          break;
+        case 'storyPoints':
+          comparison = (a.storyPoints || 0) - (b.storyPoints || 0);
+          break;
+      }
+
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+  }, [unassignedTasks, searchQuery, statusFilter, sortField, sortDirection]);
+
+  // Calculate total story points
+  const totalPoints = useMemo(() => {
+    return unassignedTasks.reduce((acc, t) => acc + (t.storyPoints || 0), 0);
+  }, [unassignedTasks]);
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const handleSelectAll = () => {
+    if (selectedTasks.size === filteredAndSortedTasks.length) {
+      setSelectedTasks(new Set());
+    } else {
+      setSelectedTasks(new Set(filteredAndSortedTasks.map(t => t.id)));
+    }
+  };
+
+  const handleSelectTask = (taskId: string) => {
+    setSelectedTasks(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(taskId)) {
+        newSet.delete(taskId);
+      } else {
+        newSet.add(taskId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleBulkDelete = () => {
+    if (onBulkDelete && selectedTasks.size > 0) {
+      onBulkDelete(Array.from(selectedTasks));
+      setSelectedTasks(new Set());
+    }
+  };
+
+  const handleBulkStatusChange = (status: SprintTask['status']) => {
+    if (onBulkStatusChange && selectedTasks.size > 0) {
+      onBulkStatusChange(Array.from(selectedTasks), status);
+      setSelectedTasks(new Set());
+    }
+  };
 
   const handleDragStart = (e: React.DragEvent, task: SprintTask) => {
     e.dataTransfer.setData('application/json', JSON.stringify({
@@ -63,160 +207,422 @@ export function BacklogPanel({
     setDraggedTaskId(null);
   };
 
-  const handleQuickAdd = (taskId: string) => {
+  const handleQuickAdd = (taskId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
     if (currentSprintId) {
       onTaskAssignToSprint(taskId, currentSprintId);
     }
   };
+
+  const getDaysRemaining = (endDate: Date) => {
+    const diff = new Date(endDate).getTime() - Date.now();
+    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+    return days;
+  };
+
+  const SortableHeader = ({
+    field,
+    children,
+    className,
+  }: {
+    field: SortField;
+    children: React.ReactNode;
+    className?: string;
+  }) => (
+    <TableHead
+      className={cn('cursor-pointer hover:bg-accent/50 select-none', className)}
+      onClick={() => handleSort(field)}
+    >
+      <div className="flex items-center gap-1">
+        {children}
+        {sortField === field ? (
+          sortDirection === 'asc' ? (
+            <ChevronUp className="h-3 w-3" />
+          ) : (
+            <ChevronDown className="h-3 w-3" />
+          )
+        ) : (
+          <ArrowUpDown className="h-3 w-3 opacity-30" />
+        )}
+      </div>
+    </TableHead>
+  );
 
   if (unassignedTasks.length === 0) {
     return null;
   }
 
   return (
-    <div className={cn(
-      'bg-[#1f2023] rounded-lg border border-[#3d3e42]',
-      'transition-all duration-300 ease-out',
-      isExpanded ? 'mb-4' : 'mb-2'
-    )}>
-      {/* Header */}
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className={cn(
-          'w-full flex items-center justify-between px-4 py-3',
-          'hover:bg-[#26272b] transition-colors duration-150',
-          'focus:outline-none rounded-t-lg'
-        )}
-      >
-        <div className="flex items-center gap-3">
-          <div className={cn(
-            'transition-transform duration-200',
-            isExpanded ? 'rotate-90' : ''
-          )}>
-            <ChevronRight className="h-4 w-4 text-[#8b8b8f]" />
-          </div>
-          <Inbox className="h-4 w-4 text-[#8b8b8f]" />
-          <span className="font-medium text-[13px] text-[#e8e8e8]">미할당 백로그</span>
-          <span className="text-[12px] text-[#8b8b8f] ml-0.5">
-            {unassignedTasks.length}
-          </span>
-        </div>
-        <div className="flex items-center gap-2 text-[12px] text-[#8b8b8f]">
-          <span>{unassignedTasks.reduce((acc, t) => acc + (t.storyPoints || 0), 0)} pts</span>
-        </div>
-      </button>
-
-      {/* Content */}
+    <TooltipProvider>
       <div className={cn(
-        'overflow-hidden transition-all duration-300 ease-out',
-        isExpanded ? 'max-h-[400px] opacity-100' : 'max-h-0 opacity-0'
+        'bg-secondary/50 rounded-lg border border-border',
+        'transition-all duration-300',
+        isExpanded ? 'mb-4' : 'mb-3'
       )}>
-        <div className="px-4 pb-3 space-y-3">
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#5c5c5f]" />
-            <Input
-              placeholder="태스크 검색..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8 h-8 text-[13px] bg-[#26272b] border-[#3d3e42] text-[#e8e8e8] placeholder:text-[#5c5c5f]"
-            />
+        {/* Header */}
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className={cn(
+            'w-full flex items-center justify-between px-4 py-3',
+            'hover:bg-accent/30 transition-colors duration-150',
+            'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset',
+            isExpanded ? 'rounded-t-lg' : 'rounded-lg'
+          )}
+        >
+          <div className="flex items-center gap-3">
+            <ChevronRight className={cn(
+              'h-4 w-4 text-muted-foreground transition-transform duration-200',
+              isExpanded && 'rotate-90'
+            )} />
+            <div className="flex items-center gap-2">
+              <Inbox className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium text-foreground">
+                미할당 백로그
+              </span>
+            </div>
+            <Badge variant="secondary" className="h-5 min-w-5 px-1.5 text-[10px] font-medium rounded-full">
+              {unassignedTasks.length}
+            </Badge>
           </div>
 
-          {/* Task List */}
-          <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1 scrollbar-thin">
-            {filteredTasks.map((task, index) => (
-              <div
-                key={task.id}
-                draggable
-                onDragStart={(e) => handleDragStart(e, task)}
-                onDragEnd={handleDragEnd}
-                onClick={() => onTaskClick(task)}
-                className={cn(
-                  'group relative bg-[#1f2023] hover:bg-[#26272b] rounded-md p-3 cursor-grab active:cursor-grabbing',
-                  'transition-all duration-150 border border-transparent hover:border-[#3d3e42]',
-                  draggedTaskId === task.id && 'opacity-40 scale-[0.98]'
-                )}
-              >
-                {/* Drag Handle */}
-                <div className="absolute top-3 left-1 opacity-0 group-hover:opacity-60 transition-opacity">
-                  <GripVertical className="h-3.5 w-3.5 text-[#5c5c5f]" />
-                </div>
-
-                {/* Content */}
-                <div className="ml-4">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <div
-                      className="w-1 h-4 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: task.color }}
-                    />
-                    <span className="text-[13px] text-[#e8e8e8] truncate">{task.name}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      {task.priority && task.priority !== 'none' && (
-                        <PriorityBadge priority={task.priority} size="xs" />
-                      )}
-                      {task.storyPoints && task.storyPoints > 0 && (
-                        <span className="text-[10px] text-[#8b8b8f] bg-[#2d2e32] px-1.5 py-0.5 rounded">
-                          {task.storyPoints}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {task.assignee && (
-                        task.assigneeAvatarUrl ? (
-                          <img
-                            src={task.assigneeAvatarUrl}
-                            alt={task.assignee}
-                            className="w-5 h-5 rounded-full"
-                          />
-                        ) : (
-                          <div className="w-5 h-5 rounded-full bg-[#5e6ad2] flex items-center justify-center text-[10px] text-white font-medium">
-                            {task.assignee.charAt(0).toUpperCase()}
-                          </div>
-                        )
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Quick Add Button */}
-                {currentSprintId && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleQuickAdd(task.id);
-                    }}
-                    className={cn(
-                      'absolute top-2 right-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100',
-                      'transition-all duration-150',
-                      'hover:bg-[#3d3e42] text-[#8b8b8f] hover:text-[#e8e8e8]'
-                    )}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-            ))}
-
-            {filteredTasks.length === 0 && searchQuery && (
-              <div className="text-center py-4 text-[13px] text-[#5c5c5f]">
-                검색 결과 없음
-              </div>
+          <div className="flex items-center gap-3">
+            {totalPoints > 0 && (
+              <Badge variant="outline" className="h-5 text-[10px] font-normal">
+                {totalPoints} pts
+              </Badge>
             )}
           </div>
+        </button>
 
-          {/* Hint */}
-          {filteredTasks.length > 0 && currentSprintId && (
-            <div className="text-[11px] text-[#5c5c5f] text-center pt-1">
-              드래그하거나 <Plus className="inline h-3 w-3" /> 버튼으로 스프린트에 추가
+        {/* Content */}
+        <div className={cn(
+          'overflow-hidden transition-all duration-300',
+          isExpanded ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'
+        )}>
+          <div className="px-4 pb-4 space-y-3">
+            {/* Toolbar */}
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2 flex-1">
+                <div className="relative flex-1 max-w-sm">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="이슈 검색..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9 h-9"
+                  />
+                </div>
+                <Select
+                  value={statusFilter}
+                  onValueChange={(value) => setStatusFilter(value as SprintTask['status'] | 'all')}
+                >
+                  <SelectTrigger className="w-[140px] h-9">
+                    <Filter className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="상태 필터" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">모든 상태</SelectItem>
+                    {STATUS_ORDER.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        <div className="flex items-center gap-2">
+                          {STATUS_ICONS[status]}
+                          {STATUS_LABELS[status]}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Bulk Actions */}
+              {selectedTasks.size > 0 && (
+                <div className="flex items-center gap-2 animate-in slide-in-from-right-5">
+                  <span className="text-sm text-muted-foreground">
+                    {selectedTasks.size}개 선택됨
+                  </span>
+                  {onBulkStatusChange && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          상태 변경
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        {STATUS_ORDER.map((status) => (
+                          <DropdownMenuItem
+                            key={status}
+                            onClick={() => handleBulkStatusChange(status)}
+                          >
+                            <div className="flex items-center gap-2">
+                              {STATUS_ICONS[status]}
+                              {STATUS_LABELS[status]}
+                            </div>
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                  {onBulkDelete && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleBulkDelete}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      삭제
+                    </Button>
+                  )}
+                </div>
+              )}
             </div>
-          )}
+
+            {/* Table */}
+            <div className="rounded-lg border bg-card max-h-[400px] overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={
+                          filteredAndSortedTasks.length > 0 &&
+                          selectedTasks.size === filteredAndSortedTasks.length
+                        }
+                        onCheckedChange={handleSelectAll}
+                        aria-label="전체 선택"
+                      />
+                    </TableHead>
+                    <TableHead className="w-10"></TableHead>
+                    <SortableHeader field="name" className="min-w-[200px]">
+                      이슈
+                    </SortableHeader>
+                    <SortableHeader field="status" className="w-[120px]">
+                      상태
+                    </SortableHeader>
+                    <SortableHeader field="priority" className="w-[100px]">
+                      우선순위
+                    </SortableHeader>
+                    <SortableHeader field="assignee" className="w-[120px]">
+                      담당자
+                    </SortableHeader>
+                    <SortableHeader field="endDate" className="w-[100px]">
+                      마감일
+                    </SortableHeader>
+                    <SortableHeader field="storyPoints" className="w-[80px]">
+                      포인트
+                    </SortableHeader>
+                    <TableHead className="w-10"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredAndSortedTasks.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
+                        {searchQuery || statusFilter !== 'all'
+                          ? '검색 결과가 없습니다'
+                          : '미할당 이슈가 없습니다'}
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredAndSortedTasks.map((task) => {
+                      const daysRemaining = getDaysRemaining(task.endDate);
+                      const isOverdue = daysRemaining < 0;
+                      const isSoon = daysRemaining >= 0 && daysRemaining <= 3;
+                      const isDragging = draggedTaskId === task.id;
+
+                      return (
+                        <TableRow
+                          key={task.id}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, task)}
+                          onDragEnd={handleDragEnd}
+                          className={cn(
+                            'cursor-pointer group',
+                            isDragging && 'opacity-50',
+                            selectedTasks.has(task.id) && 'bg-accent/50'
+                          )}
+                        >
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <Checkbox
+                              checked={selectedTasks.has(task.id)}
+                              onCheckedChange={() => handleSelectTask(task.id)}
+                              aria-label={`${task.name} 선택`}
+                            />
+                          </TableCell>
+                          <TableCell onClick={() => onTaskClick(task)}>
+                            <div
+                              className="w-1.5 h-6 rounded-full"
+                              style={{ backgroundColor: task.color }}
+                            />
+                          </TableCell>
+                          <TableCell onClick={() => onTaskClick(task)}>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium truncate">{task.name}</span>
+                              {task.linearIssueId && (
+                                <Badge variant="outline" className="text-[10px] shrink-0">
+                                  Linear
+                                </Badge>
+                              )}
+                            </div>
+                            {task.labels && task.labels.length > 0 && (
+                              <div className="flex gap-1 mt-1">
+                                {task.labels.slice(0, 2).map((label, i) => (
+                                  <span
+                                    key={i}
+                                    className="text-[10px] px-1.5 py-0.5 rounded bg-accent text-muted-foreground"
+                                  >
+                                    {typeof label === 'object' ? label.name : label}
+                                  </span>
+                                ))}
+                                {task.labels.length > 2 && (
+                                  <span className="text-[10px] text-muted-foreground">
+                                    +{task.labels.length - 2}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            {onStatusChange ? (
+                              <Select
+                                value={task.status}
+                                onValueChange={(value) =>
+                                  onStatusChange(task.id, value as SprintTask['status'])
+                                }
+                              >
+                                <SelectTrigger className="h-7 w-auto border-0 bg-transparent hover:bg-accent px-2 -ml-2 text-xs">
+                                  <SelectValue>
+                                    <div className="flex items-center gap-1.5">
+                                      {STATUS_ICONS[task.status]}
+                                      <span className="hidden sm:inline">
+                                        {STATUS_LABELS[task.status]}
+                                      </span>
+                                    </div>
+                                  </SelectValue>
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {STATUS_ORDER.map((status) => (
+                                    <SelectItem key={status} value={status}>
+                                      <div className="flex items-center gap-2">
+                                        {STATUS_ICONS[status]}
+                                        {STATUS_LABELS[status]}
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <div className="flex items-center gap-1.5">
+                                {STATUS_ICONS[task.status]}
+                                <span className="text-xs hidden sm:inline">
+                                  {STATUS_LABELS[task.status]}
+                                </span>
+                              </div>
+                            )}
+                          </TableCell>
+                          <TableCell onClick={() => onTaskClick(task)}>
+                            <PriorityBadge priority={task.priority} size="sm" />
+                          </TableCell>
+                          <TableCell onClick={() => onTaskClick(task)}>
+                            {task.assignee ? (
+                              <div className="flex items-center gap-2">
+                                <Avatar className="h-6 w-6">
+                                  <AvatarFallback className="text-[10px]">
+                                    {task.assignee.slice(0, 2).toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <span className="text-xs truncate hidden sm:inline">
+                                  {task.assignee}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell onClick={() => onTaskClick(task)}>
+                            <span
+                              className={cn(
+                                'text-xs',
+                                isOverdue && 'text-red-500 font-medium',
+                                isSoon && !isOverdue && 'text-orange-500'
+                              )}
+                            >
+                              {format(task.endDate, 'M/d', { locale: ko })}
+                            </span>
+                          </TableCell>
+                          <TableCell onClick={() => onTaskClick(task)}>
+                            {task.storyPoints !== undefined && task.storyPoints > 0 ? (
+                              <span className="text-xs text-muted-foreground">
+                                {task.storyPoints}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground/50">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 opacity-0 group-hover:opacity-100"
+                                >
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => onTaskClick(task)}>
+                                  상세 보기
+                                </DropdownMenuItem>
+                                {currentSprintId && (
+                                  <DropdownMenuItem onClick={(e) => handleQuickAdd(task.id, e as any)}>
+                                    <ArrowUpRight className="h-4 w-4 mr-2" />
+                                    스프린트에 추가
+                                  </DropdownMenuItem>
+                                )}
+                                <DropdownMenuItem>
+                                  <Copy className="h-4 w-4 mr-2" />
+                                  복제
+                                </DropdownMenuItem>
+                                {onDeleteTask && (
+                                  <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      className="text-destructive"
+                                      onClick={() => onDeleteTask(task.id)}
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      삭제
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>
+                총 {filteredAndSortedTasks.length}개 이슈
+                {searchQuery || statusFilter !== 'all'
+                  ? ` (전체 ${unassignedTasks.length}개 중)`
+                  : ''}
+              </span>
+              <span>
+                {currentSprintId && '드래그하여 스프린트에 추가 | '}
+                완료: {unassignedTasks.filter(t => t.status === 'done').length} / {unassignedTasks.length}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }

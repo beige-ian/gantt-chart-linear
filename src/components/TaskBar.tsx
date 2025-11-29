@@ -392,24 +392,24 @@ export function TaskBar({
       {/* Left Resize Handle */}
       {onDateChange && !task.isMilestone && (
         <div
-          className="absolute top-0 bottom-0 w-2 cursor-ew-resize z-30 touch-none opacity-0 group-hover/bar:opacity-100 transition-opacity"
-          style={{ left: '0px' }}
+          className="absolute top-0 bottom-0 w-3 cursor-ew-resize z-30 touch-none hover:opacity-100 transition-opacity"
+          style={{ left: '-2px', opacity: isHovered ? 1 : 0 }}
           onMouseDown={handleResizeLeftStart}
           onTouchStart={handleResizeLeftStart}
         >
-          <div className="absolute inset-y-1 left-0.5 w-1 bg-white/80 rounded-full shadow-sm" />
+          <div className="absolute inset-y-1 left-1 w-1.5 bg-white/90 rounded-full shadow-md border border-black/10" />
         </div>
       )}
 
       {/* Right Resize Handle */}
       {onDateChange && !task.isMilestone && (
         <div
-          className="absolute top-0 bottom-0 w-2 cursor-ew-resize z-30 touch-none opacity-0 group-hover/bar:opacity-100 transition-opacity"
-          style={{ right: '0px' }}
+          className="absolute top-0 bottom-0 w-3 cursor-ew-resize z-30 touch-none hover:opacity-100 transition-opacity"
+          style={{ right: '-2px', opacity: isHovered ? 1 : 0 }}
           onMouseDown={handleResizeRightStart}
           onTouchStart={handleResizeRightStart}
         >
-          <div className="absolute inset-y-1 right-0.5 w-1 bg-white/80 rounded-full shadow-sm" />
+          <div className="absolute inset-y-1 right-1 w-1.5 bg-white/90 rounded-full shadow-md border border-black/10" />
         </div>
       )}
     </div>

@@ -392,24 +392,24 @@ export function TaskBar({
       {/* Left Resize Handle */}
       {onDateChange && !task.isMilestone && (
         <div
-          className="absolute top-0 bottom-0 w-3 cursor-ew-resize z-30 touch-none hover:opacity-100 transition-opacity"
-          style={{ left: '-2px', opacity: isHovered ? 1 : 0 }}
-          onMouseDown={handleResizeLeftStart}
-          onTouchStart={handleResizeLeftStart}
+          className="absolute top-0 bottom-0 w-4 cursor-ew-resize z-40 touch-none transition-opacity"
+          style={{ left: '0px', opacity: isHovered || isResizingLeft ? 1 : 0 }}
+          onMouseDown={(e) => { e.stopPropagation(); handleResizeLeftStart(e); }}
+          onTouchStart={(e) => { e.stopPropagation(); handleResizeLeftStart(e); }}
         >
-          <div className="absolute inset-y-1 left-1 w-1.5 bg-white/90 rounded-full shadow-md border border-black/10" />
+          <div className="absolute inset-y-0.5 left-0.5 w-1.5 bg-white rounded-full shadow-lg border border-black/20" />
         </div>
       )}
 
       {/* Right Resize Handle */}
       {onDateChange && !task.isMilestone && (
         <div
-          className="absolute top-0 bottom-0 w-3 cursor-ew-resize z-30 touch-none hover:opacity-100 transition-opacity"
-          style={{ right: '-2px', opacity: isHovered ? 1 : 0 }}
-          onMouseDown={handleResizeRightStart}
-          onTouchStart={handleResizeRightStart}
+          className="absolute top-0 bottom-0 w-4 cursor-ew-resize z-40 touch-none transition-opacity"
+          style={{ right: '0px', opacity: isHovered || isResizingRight ? 1 : 0 }}
+          onMouseDown={(e) => { e.stopPropagation(); handleResizeRightStart(e); }}
+          onTouchStart={(e) => { e.stopPropagation(); handleResizeRightStart(e); }}
         >
-          <div className="absolute inset-y-1 right-1 w-1.5 bg-white/90 rounded-full shadow-md border border-black/10" />
+          <div className="absolute inset-y-0.5 right-0.5 w-1.5 bg-white rounded-full shadow-lg border border-black/20" />
         </div>
       )}
     </div>

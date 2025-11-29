@@ -406,6 +406,86 @@ export async function fetchLinearIssues(
   return issues;
 }
 
+// Fetch Linear Backlog Issues (issues without a cycle) for a team
+export async function fetchLinearBacklogIssues(
+  apiKey: string,
+  teamId: string
+): Promise<(LinearIssue & {
+  parent?: { id: string; title: string } | null;
+  stateType?: string;
+  relations?: Array<{ type: string; relatedIssue: { id: string } }>;
+})[]> {
+  // Fetch issues without a cycle (backlog)
+  const query = `{
+    issues(filter: {
+      team: { id: { eq: "${teamId}" } },
+      cycle: { null: true },
+      state: { type: { nin: ["completed", "canceled"] } }
+    }, first: 250) {
+      nodes {
+        id
+        title
+        description
+        state {
+          id
+          name
+          type
+        }
+        priority
+        dueDate
+        createdAt
+        startedAt
+        estimate
+        project {
+          id
+          name
+        }
+        cycle {
+          id
+          name
+        }
+        team {
+          id
+          name
+          icon
+        }
+        assignee {
+          id
+          name
+          displayName
+          avatarUrl
+        }
+        labels {
+          nodes {
+            id
+            name
+            color
+          }
+        }
+        parent {
+          id
+          title
+        }
+        relations {
+          nodes {
+            type
+            relatedIssue {
+              id
+            }
+          }
+        }
+      }
+    }
+  }`;
+
+  const data = await linearQuery(apiKey, query);
+  return data.issues.nodes.map((issue: any) => ({
+    ...issue,
+    stateType: issue.state?.type,
+    relations: issue.relations?.nodes || [],
+  }));
+}
+
 // Fetch Linear Cycles (Sprints) for a team
 export async function fetchLinearCycles(
   apiKey: string,
@@ -498,6 +578,11 @@ export async function fetchLinearCycleIssues(
           cycle {
             id
             name
+          }
+          team {
+            id
+            name
+            icon
           }
           assignee {
             id
@@ -844,6 +929,10 @@ export interface SprintTaskFromLinear {
   // Relations (dependencies)
   linearBlocks?: string[];
   linearBlockedBy?: string[];
+  // Team information
+  teamId?: string;
+  teamName?: string;
+  teamIcon?: string;
 }
 
 export function convertLinearIssueToSprintTask(
@@ -921,6 +1010,10 @@ export function convertLinearIssueToSprintTask(
     // Relations
     linearBlocks: linearBlocks.length > 0 ? linearBlocks : undefined,
     linearBlockedBy: linearBlockedBy.length > 0 ? linearBlockedBy : undefined,
+    // Team info
+    teamId: issue.team?.id,
+    teamName: issue.team?.name,
+    teamIcon: issue.team?.icon,
   };
 }
 

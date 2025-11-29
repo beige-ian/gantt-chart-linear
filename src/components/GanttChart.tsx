@@ -31,6 +31,60 @@ interface SimpleTaskFormProps {
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
 
+// Team color palette - distinct colors for different teams
+const TEAM_COLORS: Record<string, string> = {
+  'engineering': '#3b82f6',  // Blue
+  'design': '#8b5cf6',       // Purple
+  'product': '#10b981',      // Green
+  'marketing': '#f59e0b',    // Amber
+  'sales': '#ef4444',        // Red
+  'support': '#06b6d4',      // Cyan
+  'ops': '#f97316',          // Orange
+  'data': '#6366f1',         // Indigo
+  'qa': '#14b8a6',           // Teal
+  'devops': '#ec4899',       // Pink
+};
+
+const FALLBACK_TEAM_COLORS = [
+  '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+  '#06b6d4', '#f97316', '#6366f1', '#14b8a6', '#ec4899',
+  '#84cc16', '#a855f7', '#22c55e', '#eab308', '#0ea5e9',
+];
+
+const teamColorCache: Map<string, string> = new Map();
+
+function getTeamColor(teamId: string | undefined, teamName: string | undefined): string | undefined {
+  if (!teamId) return undefined;
+  if (teamColorCache.has(teamId)) return teamColorCache.get(teamId);
+  if (teamName) {
+    const normalizedName = teamName.toLowerCase().replace(/\s+/g, '');
+    for (const [key, color] of Object.entries(TEAM_COLORS)) {
+      if (normalizedName.includes(key) || key.includes(normalizedName)) {
+        teamColorCache.set(teamId, color);
+        return color;
+      }
+    }
+  }
+  let hash = 0;
+  for (let i = 0; i < teamId.length; i++) {
+    hash = ((hash << 5) - hash) + teamId.charCodeAt(i);
+    hash = hash & hash;
+  }
+  const colorIndex = Math.abs(hash) % FALLBACK_TEAM_COLORS.length;
+  const color = FALLBACK_TEAM_COLORS[colorIndex];
+  teamColorCache.set(teamId, color);
+  return color;
+}
+
+// Helper to get display color for a task (team color for projects, task color otherwise)
+function getTaskDisplayColor(task: Task): string {
+  if (!task.parentId && task.teamId) {
+    const teamColor = getTeamColor(task.teamId, task.teamName);
+    if (teamColor) return teamColor;
+  }
+  return task.color;
+}
+
 const PRIORITY_OPTIONS = [
   { value: 'none', label: '없음', color: 'bg-gray-100 text-gray-600' },
   { value: 'low', label: '낮음', color: 'bg-green-100 text-green-700' },
@@ -98,6 +152,10 @@ function SimpleTaskForm({ task, parentTask, allTasks, onSubmit, onCancel }: Simp
   const [cycles, setCycles] = useState<LinearCycle[]>([]);
   const [selectedCycleId, setSelectedCycleId] = useState<string>(task?.cycleId || '');
   const [isLoadingData, setIsLoadingData] = useState(false);
+  // Team info for color coding
+  const [currentTeamId, setCurrentTeamId] = useState<string | undefined>(task?.teamId);
+  const [currentTeamName, setCurrentTeamName] = useState<string | undefined>(task?.teamName);
+  const [currentTeamIcon, setCurrentTeamIcon] = useState<string | undefined>(task?.teamIcon);
 
   // Get top-level tasks (potential parents = projects)
   const topLevelTasks = allTasks.filter(t => !t.parentId && t.id !== task?.id);
@@ -122,7 +180,8 @@ function SimpleTaskForm({ task, parentTask, allTasks, onSubmit, onCancel }: Simp
         }
 
         if (teamId) {
-          const [members, labelList, cycleList] = await Promise.all([
+          const [teams, members, labelList, cycleList] = await Promise.all([
+            fetchLinearTeams(apiKey),
             fetchLinearTeamMembers(apiKey, teamId),
             fetchLinearLabels(apiKey, teamId),
             fetchLinearCycles(apiKey, teamId),
@@ -130,6 +189,13 @@ function SimpleTaskForm({ task, parentTask, allTasks, onSubmit, onCancel }: Simp
           setTeamMembers(members);
           setLabels(labelList);
           setCycles(cycleList);
+          // Store current team info
+          const currentTeam = teams.find(t => t.id === teamId);
+          if (currentTeam) {
+            setCurrentTeamId(currentTeam.id);
+            setCurrentTeamName(currentTeam.name);
+            setCurrentTeamIcon(currentTeam.icon);
+          }
         }
       } catch (error) {
         console.error('Failed to fetch Linear data:', error);
@@ -285,6 +351,10 @@ function SimpleTaskForm({ task, parentTask, allTasks, onSubmit, onCancel }: Simp
         estimate: estimate ? parseInt(estimate, 10) : task?.estimate,
         cycleId: selectedCycleId && selectedCycleId !== '__none__' ? selectedCycleId : undefined,
         cycleName: selectedCycleId && selectedCycleId !== '__none__' ? cycleName : undefined,
+        // Team info for color coding
+        teamId: currentTeamId || task?.teamId,
+        teamName: currentTeamName || task?.teamName,
+        teamIcon: currentTeamIcon || task?.teamIcon,
       });
     } catch (error) {
       console.error('Error:', error);
@@ -695,7 +765,8 @@ export function GanttChart({ className }: GanttChartProps) {
       const teamId = localStorage.getItem('linear-selected-team-id');
       if (apiKey && teamId) {
         try {
-          const [cycles, orgUsers] = await Promise.all([
+          const [teams, cycles, orgUsers] = await Promise.all([
+            fetchLinearTeams(apiKey),
             fetchLinearCycles(apiKey, teamId),
             fetchLinearOrganizationUsers(apiKey),
           ]);
@@ -715,6 +786,27 @@ export function GanttChart({ className }: GanttChartProps) {
             }
           });
           setLinearTeamMembers(memberMap);
+
+          // Get current team info and update tasks that don't have team info
+          const currentTeam = teams.find(t => t.id === teamId);
+          if (currentTeam) {
+            setTasks(prevTasks => {
+              const needsUpdate = prevTasks.some(t => !t.teamId);
+              if (!needsUpdate) return prevTasks;
+
+              return prevTasks.map(task => {
+                if (!task.teamId) {
+                  return {
+                    ...task,
+                    teamId: currentTeam.id,
+                    teamName: currentTeam.name,
+                    teamIcon: currentTeam.icon,
+                  };
+                }
+                return task;
+              });
+            });
+          }
         } catch (e) {
           console.error('Failed to load Linear data:', e);
         }
@@ -2179,10 +2271,10 @@ export function GanttChart({ className }: GanttChartProps) {
                             </div>
                           )}
 
-                          {/* Project/Task color indicator - vertical bar */}
+                          {/* Project/Task color indicator - vertical bar (uses team color for projects) */}
                           <div
                             className={`rounded-full flex-shrink-0 shadow-sm ${isProject ? 'w-1.5 h-10' : 'w-1 h-7'}`}
-                            style={{ backgroundColor: task.color }}
+                            style={{ backgroundColor: getTaskDisplayColor(task) }}
                           />
 
                           <div className="flex-1 min-w-0 ml-2">
@@ -2227,17 +2319,26 @@ export function GanttChart({ className }: GanttChartProps) {
                               </span>
                             </div>
                             {/* Second row - Assignee & Meta (only show if there's content) */}
-                            {(task.teamIcon || task.assignee || task.cycleName || (task.labels && task.labels.length > 0)) && (
+                            {(task.teamName || task.assignee || task.cycleName || (task.labels && task.labels.length > 0)) && (
                             <div className="flex items-center gap-1.5 mt-1">
-                              {/* Team Icon - only show if there's an actual emoji/icon */}
-                              {task.teamIcon && task.teamIcon.trim() && (
+                              {/* Team Badge - show icon if available, otherwise show colored team badge */}
+                              {task.teamName && (
                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <span className="text-sm flex-shrink-0 cursor-default">
-                                      {task.teamIcon}
-                                    </span>
+                                    {task.teamIcon && task.teamIcon.trim() ? (
+                                      <span className="text-sm flex-shrink-0 cursor-default">
+                                        {task.teamIcon}
+                                      </span>
+                                    ) : (
+                                      <span
+                                        className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0 cursor-default text-white shadow-sm"
+                                        style={{ backgroundColor: getTeamColor(task.teamId, task.teamName) || '#6b7280' }}
+                                      >
+                                        {task.teamName.slice(0, 2).toUpperCase()}
+                                      </span>
+                                    )}
                                   </TooltipTrigger>
-                                  <TooltipContent>{task.teamName || 'Team'}</TooltipContent>
+                                  <TooltipContent>{task.teamName}</TooltipContent>
                                 </Tooltip>
                               )}
                               {/* Assignee with Avatar */}

@@ -5,52 +5,39 @@ import {
   Sheet,
   SheetContent,
   SheetHeader,
-  SheetTitle,
 } from './ui/sheet';
-import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
-import { Badge } from './ui/badge';
 import { ScrollArea } from './ui/scroll-area';
-import { Separator } from './ui/separator';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from './ui/select';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from './ui/dropdown-menu';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Avatar, AvatarFallback } from './ui/avatar';
 import {
   X,
   MoreHorizontal,
   Calendar,
   User,
-  Hash,
   MessageSquare,
   Activity,
   CheckCircle2,
   Circle,
   Timer,
   AlertCircle,
-  Plus,
   Copy,
   Trash2,
   ExternalLink,
-  Flag,
   Loader2,
   RefreshCw,
   Send,
+  ChevronRight,
+  Hash,
+  Tag,
+  AlertOctagon,
+  SignalHigh,
+  SignalMedium,
+  SignalLow,
+  Minus,
+  Link2,
+  GitBranch,
 } from 'lucide-react';
-import { SprintTask, STATUS_LABELS, PRIORITY_LABELS, PRIORITY_COLORS } from '../types/sprint';
+import { SprintTask, STATUS_LABELS, PRIORITY_LABELS } from '../types/sprint';
 import { cn } from './ui/utils';
 import { toast } from 'sonner';
 import {
@@ -70,15 +57,23 @@ interface IssueDetailPanelProps {
 }
 
 const STATUS_ICONS: Record<SprintTask['status'], React.ReactNode> = {
-  backlog: <Circle className="h-4 w-4" style={{ color: '#9b9a97' }} />,
-  todo: <Circle className="h-4 w-4" style={{ color: '#787774' }} strokeWidth={2.5} />,
-  in_progress: <Timer className="h-4 w-4" style={{ color: '#5e6ad2' }} />,
-  in_review: <AlertCircle className="h-4 w-4" style={{ color: '#f2994a' }} />,
-  done: <CheckCircle2 className="h-4 w-4" style={{ color: '#0f783c' }} />,
+  backlog: <Circle className="h-4 w-4 text-[#95959f]" strokeWidth={1.5} />,
+  todo: <Circle className="h-4 w-4 text-[#e2e2e3]" strokeWidth={2} />,
+  in_progress: <Timer className="h-4 w-4 text-[#f2c94c]" />,
+  in_review: <AlertCircle className="h-4 w-4 text-[#bb87fc]" />,
+  done: <CheckCircle2 className="h-4 w-4 text-[#4da568]" />,
+};
+
+const PRIORITY_ICONS: Record<SprintTask['priority'], React.ReactNode> = {
+  urgent: <AlertOctagon className="h-4 w-4 text-[#f87171]" fill="#f87171" />,
+  high: <SignalHigh className="h-4 w-4 text-[#fb923c]" />,
+  medium: <SignalMedium className="h-4 w-4 text-[#facc15]" />,
+  low: <SignalLow className="h-4 w-4 text-[#60a5fa]" />,
+  none: <Minus className="h-4 w-4 text-[#6b7280]" />,
 };
 
 const STATUSES: SprintTask['status'][] = ['backlog', 'todo', 'in_progress', 'in_review', 'done'];
-const PRIORITIES: SprintTask['priority'][] = ['none', 'low', 'medium', 'high', 'urgent'];
+const PRIORITIES: SprintTask['priority'][] = ['urgent', 'high', 'medium', 'low', 'none'];
 
 export function IssueDetailPanel({
   task,
@@ -92,23 +87,22 @@ export function IssueDetailPanel({
   const [title, setTitle] = useState(task?.name || '');
   const [description, setDescription] = useState(task?.description || '');
   const [newComment, setNewComment] = useState('');
-  const [activeTab, setActiveTab] = useState('details');
+  const [activeTab, setActiveTab] = useState<'comments' | 'activity'>('comments');
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+  const [showStatusMenu, setShowStatusMenu] = useState(false);
+  const [showPriorityMenu, setShowPriorityMenu] = useState(false);
 
-  // Linear data states
   const [comments, setComments] = useState<LinearComment[]>([]);
   const [activities, setActivities] = useState<LinearIssueHistory[]>([]);
   const [isLoadingComments, setIsLoadingComments] = useState(false);
   const [isLoadingActivities, setIsLoadingActivities] = useState(false);
   const [apiKey, setApiKey] = useState<string | null>(null);
 
-  // Load API key
   useEffect(() => {
     const savedKey = localStorage.getItem('linear-api-key');
     setApiKey(savedKey);
   }, []);
 
-  // Sync title and description when task changes
   useEffect(() => {
     if (task) {
       setTitle(task.name);
@@ -116,16 +110,30 @@ export function IssueDetailPanel({
     }
   }, [task]);
 
-  // Fetch Linear comments and activities when panel opens
   useEffect(() => {
     if (open && task?.linearIssueId && apiKey) {
       loadLinearData();
     } else {
-      // Clear data when no Linear connection
       setComments([]);
       setActivities([]);
     }
   }, [open, task?.linearIssueId, apiKey]);
+
+  // Close dropdown menus when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-dropdown="status"]') && !target.closest('[data-dropdown="priority"]')) {
+        setShowStatusMenu(false);
+        setShowPriorityMenu(false);
+      }
+    };
+
+    if (showStatusMenu || showPriorityMenu) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [showStatusMenu, showPriorityMenu]);
 
   const loadLinearData = async () => {
     if (!task?.linearIssueId || !apiKey) return;
@@ -151,6 +159,7 @@ export function IssueDetailPanel({
   if (!task) return null;
 
   const isLinearLinked = !!task.linearIssueId && !!apiKey;
+  const issueIdentifier = task.linearIssueId || `TASK-${task.id.slice(0, 4).toUpperCase()}`;
 
   const handleTitleSave = () => {
     if (title.trim() && title !== task.name) {
@@ -168,10 +177,12 @@ export function IssueDetailPanel({
 
   const handleStatusChange = (status: SprintTask['status']) => {
     onUpdate({ ...task, status });
+    setShowStatusMenu(false);
   };
 
   const handlePriorityChange = (priority: SprintTask['priority']) => {
     onUpdate({ ...task, priority });
+    setShowPriorityMenu(false);
   };
 
   const handleSubmitComment = async () => {
@@ -183,7 +194,6 @@ export function IssueDetailPanel({
       if (success) {
         toast.success('댓글이 작성되었습니다');
         setNewComment('');
-        // Reload comments
         const updatedComments = await fetchLinearIssueComments(apiKey, task.linearIssueId);
         setComments(updatedComments);
       } else {
@@ -227,71 +237,46 @@ export function IssueDetailPanel({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-xl p-0 flex flex-col">
+      <SheetContent className="w-full sm:max-w-2xl p-0 flex flex-col bg-[#1f2023] border-l border-[#333438]">
         {/* Header */}
-        <SheetHeader className="px-4 py-3 border-b flex-row items-center justify-between space-y-0">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[#333438]">
           <div className="flex items-center gap-2">
             {STATUS_ICONS[task.status]}
-            <SheetTitle className="text-sm font-medium">
-              {task.linearIssueId || `TASK-${task.id.slice(0, 4).toUpperCase()}`}
-            </SheetTitle>
+            <span className="text-[13px] font-medium text-[#8b8b8f]">
+              {issueIdentifier}
+            </span>
             {isLinearLinked && (
-              <Badge variant="outline" className="text-[10px] text-blue-500 border-blue-300">
+              <span className="px-1.5 py-0.5 rounded text-[10px] bg-[#5e6ad2]/20 text-[#5e6ad2] font-medium">
                 Linear
-              </Badge>
+              </span>
             )}
           </div>
           <div className="flex items-center gap-1">
             {task.linearIssueId && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
+              <button
                 onClick={() => window.open(`https://linear.app/issue/${task.linearIssueId}`, '_blank')}
+                className="p-1.5 rounded hover:bg-[#333438] transition-colors"
               >
-                <ExternalLink className="h-4 w-4" />
-              </Button>
+                <ExternalLink className="h-4 w-4 text-[#8b8b8f]" />
+              </button>
             )}
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <Copy className="h-4 w-4" />
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem>
-                  <Copy className="h-4 w-4 mr-2" />
-                  링크 복사
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  className="text-destructive"
-                  onClick={() => {
-                    onDelete(task.id);
-                    onOpenChange(false);
-                  }}
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  삭제
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
+            <button className="p-1.5 rounded hover:bg-[#333438] transition-colors">
+              <Copy className="h-4 w-4 text-[#8b8b8f]" />
+            </button>
+            <button className="p-1.5 rounded hover:bg-[#333438] transition-colors">
+              <MoreHorizontal className="h-4 w-4 text-[#8b8b8f]" />
+            </button>
+            <button
               onClick={() => onOpenChange(false)}
+              className="p-1.5 rounded hover:bg-[#333438] transition-colors"
             >
-              <X className="h-4 w-4" />
-            </Button>
+              <X className="h-4 w-4 text-[#8b8b8f]" />
+            </button>
           </div>
-        </SheetHeader>
+        </div>
 
         <ScrollArea className="flex-1">
-          <div className="p-4 space-y-6">
+          <div className="p-5 space-y-6">
             {/* Title */}
             <div>
               {editingTitle ? (
@@ -306,12 +291,12 @@ export function IssueDetailPanel({
                       setEditingTitle(false);
                     }
                   }}
-                  className="text-lg font-semibold border-0 px-0 focus-visible:ring-0 bg-transparent"
+                  className="text-xl font-semibold bg-transparent border-0 px-0 text-[#e2e2e3] focus-visible:ring-0 placeholder:text-[#6b6b6f]"
                   autoFocus
                 />
               ) : (
                 <h2
-                  className="text-lg font-semibold cursor-text hover:bg-accent/50 rounded px-1 -mx-1 py-1"
+                  className="text-xl font-semibold text-[#e2e2e3] cursor-text hover:bg-[#26272b] rounded px-2 -mx-2 py-1 transition-colors"
                   onClick={() => {
                     setTitle(task.name);
                     setEditingTitle(true);
@@ -325,142 +310,153 @@ export function IssueDetailPanel({
             {/* Properties */}
             <div className="space-y-3">
               {/* Status */}
-              <div className="flex items-center gap-4">
-                <span className="text-sm text-muted-foreground w-24">상태</span>
-                <Select value={task.status} onValueChange={handleStatusChange}>
-                  <SelectTrigger className="h-8 w-auto border-0 bg-transparent hover:bg-accent px-2 -ml-2">
-                    <SelectValue>
-                      <div className="flex items-center gap-2">
-                        {STATUS_ICONS[task.status]}
-                        <span>{STATUS_LABELS[task.status]}</span>
-                      </div>
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STATUSES.map((status) => (
-                      <SelectItem key={status} value={status}>
-                        <div className="flex items-center gap-2">
+              <div className="flex items-center">
+                <span className="text-[13px] text-[#6b6b6f] w-28">상태</span>
+                <div className="relative" data-dropdown="status">
+                  <button
+                    onClick={() => setShowStatusMenu(!showStatusMenu)}
+                    className="flex items-center gap-2 px-2 py-1 rounded hover:bg-[#333438] transition-colors"
+                  >
+                    {STATUS_ICONS[task.status]}
+                    <span className="text-[13px] text-[#e2e2e3]">{STATUS_LABELS[task.status]}</span>
+                    <ChevronRight className="h-3 w-3 text-[#6b6b6f]" />
+                  </button>
+                  {showStatusMenu && (
+                    <div className="absolute top-full left-0 mt-1 w-44 bg-[#26272b] border border-[#333438] rounded-lg shadow-xl z-50 py-1">
+                      {STATUSES.map((status) => (
+                        <button
+                          key={status}
+                          onClick={() => handleStatusChange(status)}
+                          className={cn(
+                            'w-full flex items-center gap-2 px-3 py-1.5 text-[13px] hover:bg-[#333438] transition-colors',
+                            task.status === status ? 'text-[#e2e2e3]' : 'text-[#8b8b8f]'
+                          )}
+                        >
                           {STATUS_ICONS[status]}
                           {STATUS_LABELS[status]}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Priority */}
-              <div className="flex items-center gap-4">
-                <span className="text-sm text-muted-foreground w-24">우선순위</span>
-                <Select value={task.priority} onValueChange={handlePriorityChange}>
-                  <SelectTrigger className="h-8 w-auto border-0 bg-transparent hover:bg-accent px-2 -ml-2">
-                    <SelectValue>
-                      <div className="flex items-center gap-2">
-                        <Flag
-                          className="h-4 w-4"
-                          style={{ color: PRIORITY_COLORS[task.priority] }}
-                        />
-                        <span>{PRIORITY_LABELS[task.priority]}</span>
-                      </div>
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PRIORITIES.map((priority) => (
-                      <SelectItem key={priority} value={priority}>
-                        <div className="flex items-center gap-2">
-                          <Flag
-                            className="h-4 w-4"
-                            style={{ color: PRIORITY_COLORS[priority] }}
-                          />
-                          {PRIORITY_LABELS[priority]}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Assignee */}
-              <div className="flex items-center gap-4">
-                <span className="text-sm text-muted-foreground w-24">담당자</span>
-                <div className="flex items-center gap-2 px-2 py-1 -ml-2 rounded hover:bg-accent cursor-pointer">
-                  {task.assignee ? (
-                    <>
-                      <Avatar className="h-6 w-6">
-                        <AvatarFallback className="text-xs">
-                          {task.assignee.slice(0, 2).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="text-sm">{task.assignee}</span>
-                    </>
-                  ) : (
-                    <>
-                      <User className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">담당자 없음</span>
-                    </>
+                        </button>
+                      ))}
+                    </div>
                   )}
                 </div>
               </div>
 
+              {/* Priority */}
+              <div className="flex items-center">
+                <span className="text-[13px] text-[#6b6b6f] w-28">우선순위</span>
+                <div className="relative" data-dropdown="priority">
+                  <button
+                    onClick={() => setShowPriorityMenu(!showPriorityMenu)}
+                    className="flex items-center gap-2 px-2 py-1 rounded hover:bg-[#333438] transition-colors"
+                  >
+                    {PRIORITY_ICONS[task.priority]}
+                    <span className="text-[13px] text-[#e2e2e3]">{PRIORITY_LABELS[task.priority]}</span>
+                    <ChevronRight className="h-3 w-3 text-[#6b6b6f]" />
+                  </button>
+                  {showPriorityMenu && (
+                    <div className="absolute top-full left-0 mt-1 w-44 bg-[#26272b] border border-[#333438] rounded-lg shadow-xl z-50 py-1">
+                      {PRIORITIES.map((priority) => (
+                        <button
+                          key={priority}
+                          onClick={() => handlePriorityChange(priority)}
+                          className={cn(
+                            'w-full flex items-center gap-2 px-3 py-1.5 text-[13px] hover:bg-[#333438] transition-colors',
+                            task.priority === priority ? 'text-[#e2e2e3]' : 'text-[#8b8b8f]'
+                          )}
+                        >
+                          {PRIORITY_ICONS[priority]}
+                          {PRIORITY_LABELS[priority]}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Assignee */}
+              <div className="flex items-center">
+                <span className="text-[13px] text-[#6b6b6f] w-28">담당자</span>
+                <button className="flex items-center gap-2 px-2 py-1 rounded hover:bg-[#333438] transition-colors">
+                  {task.assignee ? (
+                    <>
+                      <div className="w-5 h-5 rounded-full bg-gradient-to-br from-[#5e6ad2] to-[#8b5cf6] flex items-center justify-center">
+                        <span className="text-[9px] font-medium text-white">
+                          {task.assignee.slice(0, 2).toUpperCase()}
+                        </span>
+                      </div>
+                      <span className="text-[13px] text-[#e2e2e3]">{task.assignee}</span>
+                    </>
+                  ) : (
+                    <>
+                      <div className="w-5 h-5 rounded-full border border-dashed border-[#4b4b4f] flex items-center justify-center">
+                        <User className="h-3 w-3 text-[#6b6b6f]" />
+                      </div>
+                      <span className="text-[13px] text-[#6b6b6f]">담당자 없음</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
               {/* Due Date */}
-              <div className="flex items-center gap-4">
-                <span className="text-sm text-muted-foreground w-24">마감일</span>
-                <div className="flex items-center gap-2 px-2 py-1 -ml-2 rounded hover:bg-accent cursor-pointer">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">
+              <div className="flex items-center">
+                <span className="text-[13px] text-[#6b6b6f] w-28">마감일</span>
+                <button className="flex items-center gap-2 px-2 py-1 rounded hover:bg-[#333438] transition-colors">
+                  <Calendar className="h-4 w-4 text-[#8b8b8f]" />
+                  <span className="text-[13px] text-[#e2e2e3]">
                     {format(task.endDate, 'M월 d일', { locale: ko })}
                   </span>
-                </div>
+                </button>
               </div>
 
               {/* Story Points */}
               {task.storyPoints !== undefined && task.storyPoints > 0 && (
-                <div className="flex items-center gap-4">
-                  <span className="text-sm text-muted-foreground w-24">스토리 포인트</span>
-                  <div className="flex items-center gap-2 px-2 py-1 -ml-2 rounded hover:bg-accent cursor-pointer">
-                    <Hash className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm">{task.storyPoints}</span>
-                  </div>
+                <div className="flex items-center">
+                  <span className="text-[13px] text-[#6b6b6f] w-28">스토리 포인트</span>
+                  <button className="flex items-center gap-2 px-2 py-1 rounded hover:bg-[#333438] transition-colors">
+                    <Hash className="h-4 w-4 text-[#8b8b8f]" />
+                    <span className="text-[13px] text-[#e2e2e3]">{task.storyPoints}</span>
+                  </button>
                 </div>
               )}
 
               {/* Labels */}
               {task.labels && task.labels.length > 0 && (
-                <div className="flex items-start gap-4">
-                  <span className="text-sm text-muted-foreground w-24 pt-1">라벨</span>
+                <div className="flex items-start">
+                  <span className="text-[13px] text-[#6b6b6f] w-28 pt-1">라벨</span>
                   <div className="flex flex-wrap gap-1.5">
                     {task.labels.map((label, i) => (
-                      <Badge key={i} variant="secondary" className="text-xs">
-                        {label}
-                      </Badge>
+                      <span
+                        key={i}
+                        className="px-2 py-0.5 rounded text-[12px] bg-[#333438] text-[#8b8b8f]"
+                      >
+                        {typeof label === 'object' ? label.name : label}
+                      </span>
                     ))}
-                    <Button variant="ghost" size="sm" className="h-6 px-2">
-                      <Plus className="h-3 w-3" />
-                    </Button>
                   </div>
                 </div>
               )}
             </div>
 
-            <Separator />
+            {/* Divider */}
+            <div className="h-px bg-[#333438]" />
 
             {/* Description */}
             <div>
-              <h3 className="text-sm font-medium mb-2">설명</h3>
+              <h3 className="text-[13px] font-medium text-[#8b8b8f] mb-2">설명</h3>
               {editingDescription ? (
                 <Textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   onBlur={handleDescriptionSave}
-                  className="min-h-[100px] resize-none"
+                  className="min-h-[100px] resize-none bg-[#26272b] border-[#333438] text-[13px] text-[#e2e2e3] placeholder:text-[#6b6b6f] focus:border-[#5e6ad2]"
                   placeholder="설명을 입력하세요..."
                   autoFocus
                 />
               ) : (
                 <div
                   className={cn(
-                    'min-h-[60px] p-2 -mx-2 rounded cursor-text hover:bg-accent/50 text-sm whitespace-pre-wrap',
-                    !task.description && 'text-muted-foreground'
+                    'min-h-[60px] p-3 rounded-lg cursor-text hover:bg-[#26272b] text-[13px] whitespace-pre-wrap transition-colors',
+                    task.description ? 'text-[#e2e2e3]' : 'text-[#6b6b6f]'
                   )}
                   onClick={() => {
                     setDescription(task.description || '');
@@ -472,158 +468,200 @@ export function IssueDetailPanel({
               )}
             </div>
 
-            <Separator />
+            {/* Divider */}
+            <div className="h-px bg-[#333438]" />
 
-            {/* Tabs for Comments/Activity */}
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <div className="flex items-center justify-between">
-                <TabsList className="h-9 bg-transparent p-0 border-b rounded-none">
-                  <TabsTrigger
-                    value="details"
-                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4"
+            {/* Tabs */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={() => setActiveTab('comments')}
+                    className={cn(
+                      'flex items-center gap-2 pb-2 text-[13px] font-medium border-b-2 transition-colors',
+                      activeTab === 'comments'
+                        ? 'text-[#e2e2e3] border-[#5e6ad2]'
+                        : 'text-[#6b6b6f] border-transparent hover:text-[#8b8b8f]'
+                    )}
                   >
-                    <MessageSquare className="h-4 w-4 mr-2" />
+                    <MessageSquare className="h-4 w-4" />
                     댓글 {comments.length > 0 && `(${comments.length})`}
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="activity"
-                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4"
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('activity')}
+                    className={cn(
+                      'flex items-center gap-2 pb-2 text-[13px] font-medium border-b-2 transition-colors',
+                      activeTab === 'activity'
+                        ? 'text-[#e2e2e3] border-[#5e6ad2]'
+                        : 'text-[#6b6b6f] border-transparent hover:text-[#8b8b8f]'
+                    )}
                   >
-                    <Activity className="h-4 w-4 mr-2" />
+                    <Activity className="h-4 w-4" />
                     활동
-                  </TabsTrigger>
-                </TabsList>
+                  </button>
+                </div>
                 {isLinearLinked && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
+                  <button
                     onClick={loadLinearData}
                     disabled={isLoadingComments || isLoadingActivities}
+                    className="p-1.5 rounded hover:bg-[#333438] transition-colors"
                   >
-                    <RefreshCw className={cn('h-4 w-4', (isLoadingComments || isLoadingActivities) && 'animate-spin')} />
-                  </Button>
+                    <RefreshCw className={cn('h-4 w-4 text-[#8b8b8f]', (isLoadingComments || isLoadingActivities) && 'animate-spin')} />
+                  </button>
                 )}
               </div>
 
-              <TabsContent value="details" className="mt-4 space-y-4">
-                {/* New Comment Input - Only show if Linear linked */}
-                {isLinearLinked ? (
-                  <div className="flex gap-3">
-                    <Avatar className="h-8 w-8 shrink-0">
-                      <AvatarFallback className="text-xs">나</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1">
-                      <Textarea
-                        placeholder="댓글을 입력하세요... (Linear에 동기화됩니다)"
-                        value={newComment}
-                        onChange={(e) => setNewComment(e.target.value)}
-                        className="min-h-[80px] resize-none"
-                        onKeyDown={(e) => {
-                          if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-                            handleSubmitComment();
-                          }
-                        }}
-                      />
-                      <div className="flex justify-between items-center mt-2">
-                        <span className="text-xs text-muted-foreground">⌘+Enter로 전송</span>
-                        <Button
-                          size="sm"
-                          disabled={!newComment.trim() || isSubmittingComment}
-                          onClick={handleSubmitComment}
-                        >
-                          {isSubmittingComment ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <>
-                              <Send className="h-4 w-4 mr-1" />
-                              댓글 작성
-                            </>
-                          )}
-                        </Button>
+              {activeTab === 'comments' && (
+                <div className="space-y-4">
+                  {/* New Comment Input */}
+                  {isLinearLinked ? (
+                    <div className="flex gap-3">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#5e6ad2] to-[#8b5cf6] flex items-center justify-center shrink-0">
+                        <span className="text-[10px] font-medium text-white">나</span>
+                      </div>
+                      <div className="flex-1">
+                        <Textarea
+                          placeholder="댓글을 입력하세요... (Linear에 동기화됩니다)"
+                          value={newComment}
+                          onChange={(e) => setNewComment(e.target.value)}
+                          className="min-h-[80px] resize-none bg-[#26272b] border-[#333438] text-[13px] text-[#e2e2e3] placeholder:text-[#6b6b6f] focus:border-[#5e6ad2]"
+                          onKeyDown={(e) => {
+                            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                              handleSubmitComment();
+                            }
+                          }}
+                        />
+                        <div className="flex justify-between items-center mt-2">
+                          <span className="text-[11px] text-[#6b6b6f]">⌘+Enter로 전송</span>
+                          <button
+                            disabled={!newComment.trim() || isSubmittingComment}
+                            onClick={handleSubmitComment}
+                            className={cn(
+                              'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors',
+                              newComment.trim()
+                                ? 'bg-[#5e6ad2] hover:bg-[#6872d9] text-white'
+                                : 'bg-[#333438] text-[#6b6b6f] cursor-not-allowed'
+                            )}
+                          >
+                            {isSubmittingComment ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <>
+                                <Send className="h-3.5 w-3.5" />
+                                댓글 작성
+                              </>
+                            )}
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-4 text-sm text-muted-foreground border rounded-lg bg-muted/30">
-                    <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p>Linear와 연결된 이슈만 댓글을 작성할 수 있습니다</p>
-                  </div>
-                )}
+                  ) : (
+                    <div className="text-center py-6 rounded-lg bg-[#26272b] border border-[#333438]">
+                      <MessageSquare className="h-8 w-8 mx-auto mb-2 text-[#6b6b6f]" />
+                      <p className="text-[13px] text-[#6b6b6f]">Linear와 연결된 이슈만 댓글을 작성할 수 있습니다</p>
+                    </div>
+                  )}
 
-                {/* Comments List */}
-                {isLoadingComments ? (
-                  <div className="flex justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                  </div>
-                ) : comments.length > 0 ? (
-                  <div className="space-y-4">
-                    {comments.map((comment) => (
-                      <div key={comment.id} className="flex gap-3">
-                        <Avatar className="h-8 w-8 shrink-0">
-                          <AvatarFallback className="text-xs">
-                            {comment.user?.name?.slice(0, 2) || '?'}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">
-                              {comment.user?.displayName || comment.user?.name || '알 수 없음'}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {formatRelativeTime(comment.createdAt)}
+                  {/* Comments List */}
+                  {isLoadingComments ? (
+                    <div className="flex justify-center py-8">
+                      <Loader2 className="h-5 w-5 animate-spin text-[#6b6b6f]" />
+                    </div>
+                  ) : comments.length > 0 ? (
+                    <div className="space-y-4">
+                      {comments.map((comment) => (
+                        <div key={comment.id} className="flex gap-3">
+                          <div className="w-8 h-8 rounded-full bg-[#333438] flex items-center justify-center shrink-0">
+                            <span className="text-[10px] font-medium text-[#8b8b8f]">
+                              {comment.user?.name?.slice(0, 2) || '?'}
                             </span>
                           </div>
-                          <p className="text-sm mt-1 whitespace-pre-wrap">{comment.body}</p>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[13px] font-medium text-[#e2e2e3]">
+                                {comment.user?.displayName || comment.user?.name || '알 수 없음'}
+                              </span>
+                              <span className="text-[11px] text-[#6b6b6f]">
+                                {formatRelativeTime(comment.createdAt)}
+                              </span>
+                            </div>
+                            <p className="text-[13px] text-[#8b8b8f] mt-1 whitespace-pre-wrap">{comment.body}</p>
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : isLinearLinked ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <p className="text-sm">아직 댓글이 없습니다</p>
-                  </div>
-                ) : null}
-              </TabsContent>
+                      ))}
+                    </div>
+                  ) : isLinearLinked ? (
+                    <div className="text-center py-8 text-[#6b6b6f]">
+                      <p className="text-[13px]">아직 댓글이 없습니다</p>
+                    </div>
+                  ) : null}
+                </div>
+              )}
 
-              <TabsContent value="activity" className="mt-4">
-                {isLoadingActivities ? (
-                  <div className="flex justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                  </div>
-                ) : activities.length > 0 ? (
-                  <div className="space-y-3">
-                    {activities.map((activity) => (
-                      <div key={activity.id} className="flex items-start gap-3">
-                        <div className="w-8 flex justify-center">
-                          <div className="w-2 h-2 rounded-full bg-muted-foreground/30 mt-2" />
+              {activeTab === 'activity' && (
+                <div>
+                  {isLoadingActivities ? (
+                    <div className="flex justify-center py-8">
+                      <Loader2 className="h-5 w-5 animate-spin text-[#6b6b6f]" />
+                    </div>
+                  ) : activities.length > 0 ? (
+                    <div className="space-y-3">
+                      {activities.map((activity) => (
+                        <div key={activity.id} className="flex items-start gap-3">
+                          <div className="w-8 flex justify-center pt-1">
+                            <div className="w-2 h-2 rounded-full bg-[#333438]" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-[13px]">
+                              <span className="font-medium text-[#e2e2e3]">{activity.actor?.name || '시스템'}</span>
+                              <span className="text-[#8b8b8f]"> {getActivityDescription(activity)}</span>
+                            </p>
+                            <span className="text-[11px] text-[#6b6b6f]">
+                              {formatRelativeTime(activity.createdAt)}
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex-1">
-                          <p className="text-sm">
-                            <span className="font-medium">{activity.actor?.name || '시스템'}</span>
-                            <span className="text-muted-foreground"> {getActivityDescription(activity)}</span>
-                          </p>
-                          <span className="text-xs text-muted-foreground">
-                            {formatRelativeTime(activity.createdAt)}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : isLinearLinked ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <p className="text-sm">활동 기록이 없습니다</p>
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Activity className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">Linear와 연결된 이슈만 활동 기록을 볼 수 있습니다</p>
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
+                      ))}
+                    </div>
+                  ) : isLinearLinked ? (
+                    <div className="text-center py-8 text-[#6b6b6f]">
+                      <p className="text-[13px]">활동 기록이 없습니다</p>
+                    </div>
+                  ) : (
+                    <div className="text-center py-6 rounded-lg bg-[#26272b] border border-[#333438]">
+                      <Activity className="h-8 w-8 mx-auto mb-2 text-[#6b6b6f]" />
+                      <p className="text-[13px] text-[#6b6b6f]">Linear와 연결된 이슈만 활동 기록을 볼 수 있습니다</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </ScrollArea>
+
+        {/* Footer Actions */}
+        <div className="flex items-center justify-between px-4 py-3 border-t border-[#333438]">
+          <div className="flex items-center gap-2">
+            <button className="flex items-center gap-1.5 px-2 py-1 rounded text-[12px] text-[#8b8b8f] hover:bg-[#333438] transition-colors">
+              <Link2 className="h-3.5 w-3.5" />
+              링크 연결
+            </button>
+            <button className="flex items-center gap-1.5 px-2 py-1 rounded text-[12px] text-[#8b8b8f] hover:bg-[#333438] transition-colors">
+              <GitBranch className="h-3.5 w-3.5" />
+              브랜치 생성
+            </button>
+          </div>
+          <button
+            onClick={() => {
+              onDelete(task.id);
+              onOpenChange(false);
+            }}
+            className="flex items-center gap-1.5 px-2 py-1 rounded text-[12px] text-[#f87171] hover:bg-[#f87171]/10 transition-colors"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            삭제
+          </button>
+        </div>
       </SheetContent>
     </Sheet>
   );

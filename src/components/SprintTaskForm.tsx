@@ -5,8 +5,24 @@ import { Label } from './ui/label';
 import { Slider } from './ui/slider';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Checkbox } from './ui/checkbox';
-import { Trash2, Loader2, User, Tag, Check } from 'lucide-react';
+import {
+  Trash2,
+  Loader2,
+  User,
+  Tag,
+  Check,
+  Calendar,
+  Circle,
+  Timer,
+  AlertCircle,
+  CheckCircle2,
+  AlertOctagon,
+  SignalHigh,
+  SignalMedium,
+  SignalLow,
+  Minus,
+  Hash,
+} from 'lucide-react';
 import { SprintTask, Sprint, STATUS_LABELS, PRIORITY_LABELS } from '../types/sprint';
 import { fetchLinearTeamMembers, fetchLinearLabels, fetchLinearTeams } from '../services/linear';
 import { cn } from './ui/utils';
@@ -34,17 +50,33 @@ interface SprintTaskFormProps {
 }
 
 const predefinedColors = [
-  '#3b82f6', // blue
-  '#10b981', // green
-  '#f59e0b', // yellow
-  '#ef4444', // red
-  '#8b5cf6', // purple
-  '#06b6d4', // cyan
-  '#f97316', // orange
-  '#84cc16', // lime
+  '#5e6ad2', // Linear purple
+  '#4da568', // Green
+  '#f2c94c', // Yellow
+  '#f87171', // Red
+  '#bb87fc', // Purple
+  '#60a5fa', // Blue
+  '#f2994a', // Orange
+  '#84cc16', // Lime
 ];
 
 const STORY_POINTS = [0, 1, 2, 3, 5, 8, 13, 21];
+
+const STATUS_ICONS: Record<SprintTask['status'], React.ReactNode> = {
+  backlog: <Circle className="h-4 w-4 text-[#95959f]" strokeWidth={1.5} />,
+  todo: <Circle className="h-4 w-4 text-[#e2e2e3]" strokeWidth={2} />,
+  in_progress: <Timer className="h-4 w-4 text-[#f2c94c]" />,
+  in_review: <AlertCircle className="h-4 w-4 text-[#bb87fc]" />,
+  done: <CheckCircle2 className="h-4 w-4 text-[#4da568]" />,
+};
+
+const PRIORITY_ICONS: Record<SprintTask['priority'], React.ReactNode> = {
+  urgent: <AlertOctagon className="h-4 w-4 text-[#f87171]" fill="#f87171" />,
+  high: <SignalHigh className="h-4 w-4 text-[#fb923c]" />,
+  medium: <SignalMedium className="h-4 w-4 text-[#facc15]" />,
+  low: <SignalLow className="h-4 w-4 text-[#60a5fa]" />,
+  none: <Minus className="h-4 w-4 text-[#6b7280]" />,
+};
 
 export function SprintTaskForm({
   task,
@@ -72,14 +104,11 @@ export function SprintTaskForm({
   });
 
   const [labelInput, setLabelInput] = useState('');
-
-  // Linear integration states
   const [linearMembers, setLinearMembers] = useState<LinearMember[]>([]);
   const [linearLabels, setLinearLabels] = useState<LinearLabel[]>([]);
   const [isLoadingLinear, setIsLoadingLinear] = useState(false);
   const [hasLinearConnection, setHasLinearConnection] = useState(false);
 
-  // Load Linear data
   useEffect(() => {
     const loadLinearData = async () => {
       const apiKey = localStorage.getItem('linear-api-key');
@@ -169,7 +198,7 @@ export function SprintTaskForm({
     const endDate = new Date(formData.endDate);
 
     if (endDate <= startDate) {
-      alert('End date must be after start date');
+      alert('마감일은 시작일 이후여야 합니다');
       return;
     }
 
@@ -186,7 +215,6 @@ export function SprintTaskForm({
       assignee: formData.assignee.trim() || undefined,
       sprintId: formData.sprintId || undefined,
       labels: formData.labels.length > 0 ? formData.labels : undefined,
-      // Include Linear-specific fields for API calls
       ...(formData.assigneeId && { assigneeId: formData.assigneeId }),
       ...(formData.labelIds.length > 0 && { labelIds: formData.labelIds }),
     } as any);
@@ -230,47 +258,51 @@ export function SprintTaskForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+    <form onSubmit={handleSubmit} className="space-y-5 max-h-[70vh] overflow-y-auto pr-2">
       {/* Task Name */}
       <div className="space-y-2">
-        <Label htmlFor="taskName">Task Name *</Label>
+        <Label htmlFor="taskName" className="text-[13px] text-[#e2e2e3]">이슈 제목 *</Label>
         <Input
           id="taskName"
           value={formData.name}
           onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          placeholder="Enter task name"
+          placeholder="이슈 제목을 입력하세요"
           required
+          className="h-9 bg-[#26272b] border-[#333438] text-[#e2e2e3] placeholder:text-[#6b6b6f] focus:border-[#5e6ad2]"
         />
       </div>
 
       {/* Description */}
       <div className="space-y-2">
-        <Label htmlFor="description">Description</Label>
+        <Label htmlFor="description" className="text-[13px] text-[#e2e2e3]">설명</Label>
         <Textarea
           id="description"
           value={formData.description}
           onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-          placeholder="Add a description..."
+          placeholder="설명을 추가하세요..."
           rows={3}
+          className="resize-none bg-[#26272b] border-[#333438] text-[#e2e2e3] placeholder:text-[#6b6b6f] focus:border-[#5e6ad2]"
         />
       </div>
 
-      {/* Sprint & Status */}
+      {/* Status & Priority */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label>Sprint</Label>
+          <Label className="text-[13px] text-[#e2e2e3]">상태</Label>
           <Select
-            value={formData.sprintId}
-            onValueChange={(value) => setFormData({ ...formData, sprintId: value })}
+            value={formData.status}
+            onValueChange={(value) => setFormData({ ...formData, status: value as SprintTask['status'] })}
           >
-            <SelectTrigger>
-              <SelectValue placeholder="Select sprint" />
+            <SelectTrigger className="h-9 bg-[#26272b] border-[#333438] text-[#e2e2e3]">
+              <SelectValue />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">Backlog (No Sprint)</SelectItem>
-              {sprints.filter(s => s.status !== 'completed').map(sprint => (
-                <SelectItem key={sprint.id} value={sprint.id}>
-                  {sprint.name} {sprint.status === 'active' ? '(Active)' : ''}
+            <SelectContent className="bg-[#26272b] border-[#333438]">
+              {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                <SelectItem key={value} value={value} className="text-[#e2e2e3] focus:bg-[#333438]">
+                  <div className="flex items-center gap-2">
+                    {STATUS_ICONS[value as SprintTask['status']]}
+                    {label}
+                  </div>
                 </SelectItem>
               ))}
             </SelectContent>
@@ -278,55 +310,68 @@ export function SprintTaskForm({
         </div>
 
         <div className="space-y-2">
-          <Label>Status</Label>
+          <Label className="text-[13px] text-[#e2e2e3]">우선순위</Label>
           <Select
-            value={formData.status}
-            onValueChange={(value) => setFormData({ ...formData, status: value as SprintTask['status'] })}
+            value={formData.priority}
+            onValueChange={(value) => setFormData({ ...formData, priority: value as SprintTask['priority'] })}
           >
-            <SelectTrigger>
+            <SelectTrigger className="h-9 bg-[#26272b] border-[#333438] text-[#e2e2e3]">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
-              {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                <SelectItem key={value} value={value}>{label}</SelectItem>
+            <SelectContent className="bg-[#26272b] border-[#333438]">
+              {Object.entries(PRIORITY_LABELS).map(([value, label]) => (
+                <SelectItem key={value} value={value} className="text-[#e2e2e3] focus:bg-[#333438]">
+                  <div className="flex items-center gap-2">
+                    {PRIORITY_ICONS[value as SprintTask['priority']]}
+                    {label}
+                  </div>
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
       </div>
 
-      {/* Priority & Story Points */}
+      {/* Sprint & Story Points */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label>Priority</Label>
+          <Label className="text-[13px] text-[#e2e2e3]">스프린트</Label>
           <Select
-            value={formData.priority}
-            onValueChange={(value) => setFormData({ ...formData, priority: value as SprintTask['priority'] })}
+            value={formData.sprintId}
+            onValueChange={(value) => setFormData({ ...formData, sprintId: value })}
           >
-            <SelectTrigger>
-              <SelectValue />
+            <SelectTrigger className="h-9 bg-[#26272b] border-[#333438] text-[#e2e2e3]">
+              <SelectValue placeholder="스프린트 선택" />
             </SelectTrigger>
-            <SelectContent>
-              {Object.entries(PRIORITY_LABELS).map(([value, label]) => (
-                <SelectItem key={value} value={value}>{label}</SelectItem>
+            <SelectContent className="bg-[#26272b] border-[#333438]">
+              <SelectItem value="" className="text-[#8b8b8f] focus:bg-[#333438]">
+                백로그 (스프린트 미지정)
+              </SelectItem>
+              {sprints.filter(s => s.status !== 'completed').map(sprint => (
+                <SelectItem key={sprint.id} value={sprint.id} className="text-[#e2e2e3] focus:bg-[#333438]">
+                  {sprint.name} {sprint.status === 'active' ? '(활성)' : ''}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
 
         <div className="space-y-2">
-          <Label>Story Points</Label>
+          <Label className="text-[13px] text-[#e2e2e3] flex items-center gap-1.5">
+            <Hash className="h-3.5 w-3.5" />
+            스토리 포인트
+          </Label>
           <Select
             value={formData.storyPoints.toString()}
             onValueChange={(value) => setFormData({ ...formData, storyPoints: parseInt(value) })}
           >
-            <SelectTrigger>
+            <SelectTrigger className="h-9 bg-[#26272b] border-[#333438] text-[#e2e2e3]">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-[#26272b] border-[#333438]">
               {STORY_POINTS.map(points => (
-                <SelectItem key={points} value={points.toString()}>
-                  {points === 0 ? 'Not estimated' : `${points} points`}
+                <SelectItem key={points} value={points.toString()} className="text-[#e2e2e3] focus:bg-[#333438]">
+                  {points === 0 ? '미정' : `${points} 포인트`}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -337,33 +382,41 @@ export function SprintTaskForm({
       {/* Dates */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="startDate">Start Date</Label>
+          <Label htmlFor="startDate" className="text-[13px] text-[#e2e2e3] flex items-center gap-1.5">
+            <Calendar className="h-3.5 w-3.5" />
+            시작일
+          </Label>
           <Input
             id="startDate"
             type="date"
             value={formData.startDate}
             onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
             required
+            className="h-9 bg-[#26272b] border-[#333438] text-[#e2e2e3]"
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="endDate">Due Date</Label>
+          <Label htmlFor="endDate" className="text-[13px] text-[#e2e2e3] flex items-center gap-1.5">
+            <Calendar className="h-3.5 w-3.5" />
+            마감일
+          </Label>
           <Input
             id="endDate"
             type="date"
             value={formData.endDate}
             onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
             required
+            className="h-9 bg-[#26272b] border-[#333438] text-[#e2e2e3]"
           />
         </div>
       </div>
 
       {/* Assignee */}
       <div className="space-y-2">
-        <Label className="flex items-center gap-2">
-          <User className="h-4 w-4" />
-          Assignee
-          {isLoadingLinear && <Loader2 className="h-3 w-3 animate-spin" />}
+        <Label className="text-[13px] text-[#e2e2e3] flex items-center gap-1.5">
+          <User className="h-3.5 w-3.5" />
+          담당자
+          {isLoadingLinear && <Loader2 className="h-3 w-3 animate-spin text-[#5e6ad2]" />}
         </Label>
         {hasLinearConnection && linearMembers.length > 0 ? (
           <Select
@@ -376,17 +429,17 @@ export function SprintTaskForm({
               }
             }}
           >
-            <SelectTrigger>
-              <SelectValue placeholder="Select assignee" />
+            <SelectTrigger className="h-9 bg-[#26272b] border-[#333438] text-[#e2e2e3]">
+              <SelectValue placeholder="담당자 선택" />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">
-                <span className="text-muted-foreground">Unassigned</span>
+            <SelectContent className="bg-[#26272b] border-[#333438]">
+              <SelectItem value="none" className="text-[#8b8b8f] focus:bg-[#333438]">
+                미할당
               </SelectItem>
               {linearMembers.map(member => (
-                <SelectItem key={member.id} value={member.id}>
+                <SelectItem key={member.id} value={member.id} className="text-[#e2e2e3] focus:bg-[#333438]">
                   <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium">
+                    <div className="w-5 h-5 rounded-full bg-gradient-to-br from-[#5e6ad2] to-[#8b5cf6] flex items-center justify-center text-[9px] font-medium text-white">
                       {(member.displayName || member.name).slice(0, 2).toUpperCase()}
                     </div>
                     {member.displayName || member.name}
@@ -400,7 +453,8 @@ export function SprintTaskForm({
             id="assignee"
             value={formData.assignee}
             onChange={(e) => setFormData({ ...formData, assignee: e.target.value })}
-            placeholder="Assign to..."
+            placeholder="담당자 이름"
+            className="h-9 bg-[#26272b] border-[#333438] text-[#e2e2e3] placeholder:text-[#6b6b6f]"
           />
         )}
       </div>
@@ -408,27 +462,28 @@ export function SprintTaskForm({
       {/* Progress (only if not done) */}
       {formData.status !== 'done' && (
         <div className="space-y-2">
-          <Label>Progress: {formData.progress}%</Label>
+          <Label className="text-[13px] text-[#e2e2e3]">진행률: {formData.progress}%</Label>
           <Slider
             value={[formData.progress]}
             onValueChange={(value) => setFormData({ ...formData, progress: value[0] })}
             max={100}
             step={10}
+            className="[&_[role=slider]]:bg-[#5e6ad2] [&_[role=slider]]:border-[#5e6ad2]"
           />
         </div>
       )}
 
       {/* Labels */}
       <div className="space-y-2">
-        <Label className="flex items-center gap-2">
-          <Tag className="h-4 w-4" />
-          Labels
+        <Label className="text-[13px] text-[#e2e2e3] flex items-center gap-1.5">
+          <Tag className="h-3.5 w-3.5" />
+          라벨
         </Label>
 
         {/* Linear Labels Selection */}
         {hasLinearConnection && linearLabels.length > 0 && (
-          <div className="border rounded-lg p-3 space-y-2 bg-muted/20">
-            <p className="text-xs text-muted-foreground mb-2">Linear Labels</p>
+          <div className="border border-[#333438] rounded-lg p-3 space-y-2 bg-[#1f2023]">
+            <p className="text-[11px] text-[#6b6b6f] mb-2">Linear 라벨</p>
             <div className="flex flex-wrap gap-2">
               {linearLabels.map(label => {
                 const isSelected = formData.labelIds.includes(label.id);
@@ -438,10 +493,10 @@ export function SprintTaskForm({
                     type="button"
                     onClick={() => handleLabelToggle(label.id, label.name)}
                     className={cn(
-                      "px-2.5 py-1 text-xs rounded-full border transition-all flex items-center gap-1.5",
+                      "px-2.5 py-1 text-[11px] rounded-full border transition-all flex items-center gap-1.5",
                       isSelected
                         ? "border-transparent text-white"
-                        : "border-border hover:border-primary/50 text-foreground"
+                        : "border-[#333438] hover:border-[#5e6ad2]/50 text-[#8b8b8f]"
                     )}
                     style={{
                       backgroundColor: isSelected ? label.color : 'transparent',
@@ -461,26 +516,32 @@ export function SprintTaskForm({
           <Input
             value={labelInput}
             onChange={(e) => setLabelInput(e.target.value)}
-            placeholder="Add custom label"
+            placeholder="커스텀 라벨 추가"
             onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddLabel())}
+            className="h-8 bg-[#26272b] border-[#333438] text-[#e2e2e3] placeholder:text-[#6b6b6f] text-[13px]"
           />
-          <Button type="button" variant="outline" onClick={handleAddLabel}>
-            Add
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleAddLabel}
+            className="h-8 bg-[#26272b] border-[#333438] text-[#8b8b8f] hover:bg-[#333438] hover:text-[#e2e2e3] text-[13px]"
+          >
+            추가
           </Button>
         </div>
 
         {/* Display selected/custom labels */}
         {formData.labels.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-2">
+          <div className="flex flex-wrap gap-1.5 mt-2">
             {formData.labels.map(label => {
               const linearLabel = linearLabels.find(l => l.name === label);
               return (
                 <span
                   key={label}
-                  className="px-2 py-1 text-sm rounded-md flex items-center gap-1"
+                  className="px-2 py-1 text-[11px] rounded-md flex items-center gap-1"
                   style={{
-                    backgroundColor: linearLabel?.color || 'hsl(var(--muted))',
-                    color: linearLabel ? 'white' : 'inherit',
+                    backgroundColor: linearLabel?.color || '#333438',
+                    color: linearLabel ? 'white' : '#8b8b8f',
                   }}
                 >
                   {label}
@@ -495,7 +556,7 @@ export function SprintTaskForm({
                         }));
                       }
                     }}
-                    className="text-current opacity-70 hover:opacity-100"
+                    className="text-current opacity-70 hover:opacity-100 ml-0.5"
                   >
                     ×
                   </button>
@@ -508,17 +569,18 @@ export function SprintTaskForm({
 
       {/* Color */}
       <div className="space-y-2">
-        <Label>Color</Label>
+        <Label className="text-[13px] text-[#e2e2e3]">색상</Label>
         <div className="flex gap-2 flex-wrap">
           {predefinedColors.map((color) => (
             <button
               key={color}
               type="button"
-              className={`w-8 h-8 rounded-md border-2 transition-all ${
+              className={cn(
+                "w-7 h-7 rounded-md border-2 transition-all",
                 formData.color === color
-                  ? 'border-foreground scale-110'
-                  : 'border-border hover:scale-105'
-              }`}
+                  ? "border-[#e2e2e3] scale-110"
+                  : "border-transparent hover:scale-105 hover:border-[#333438]"
+              )}
               style={{ backgroundColor: color }}
               onClick={() => setFormData({ ...formData, color })}
             />
@@ -527,21 +589,35 @@ export function SprintTaskForm({
       </div>
 
       {/* Actions */}
-      <div className="flex justify-between pt-4 border-t">
+      <div className="flex justify-between pt-4 border-t border-[#333438]">
         <div>
           {onDelete && (
-            <Button type="button" variant="destructive" size="sm" onClick={onDelete} className="gap-2">
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={onDelete}
+              className="gap-2 bg-[#f87171]/10 text-[#f87171] hover:bg-[#f87171]/20 border-0"
+            >
               <Trash2 className="h-4 w-4" />
-              Delete
+              삭제
             </Button>
           )}
         </div>
         <div className="flex gap-2">
-          <Button type="button" variant="outline" onClick={onCancel}>
-            Cancel
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel}
+            className="bg-[#26272b] border-[#333438] text-[#8b8b8f] hover:bg-[#333438] hover:text-[#e2e2e3]"
+          >
+            취소
           </Button>
-          <Button type="submit">
-            {task ? 'Update Task' : 'Create Task'}
+          <Button
+            type="submit"
+            className="bg-[#5e6ad2] hover:bg-[#6872d9] text-white border-0"
+          >
+            {task ? '이슈 수정' : '이슈 생성'}
           </Button>
         </div>
       </div>

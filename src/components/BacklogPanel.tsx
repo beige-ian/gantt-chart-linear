@@ -1,31 +1,20 @@
 import React, { useState, useMemo } from 'react';
-import { format } from 'date-fns';
-import { ko } from 'date-fns/locale';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from './ui/table';
+import { Card } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
-import { Avatar, AvatarFallback } from './ui/avatar';
 import { Input } from './ui/input';
 import {
   ChevronRight,
+  ChevronDown,
   Search,
   Inbox,
-  ArrowUpRight,
-  ChevronUp,
-  ChevronDown,
-  ArrowUpDown,
+  GripVertical,
+  Plus,
+  Filter,
 } from 'lucide-react';
-import { SprintTask, STATUS_LABELS, PRIORITY_COLORS } from '../types/sprint';
-import { cn } from './ui/utils';
-import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from './ui/tooltip';
+import { SprintTask, PRIORITY_LABELS } from '../types/sprint';
 import { PriorityBadge } from './ui/status-badge';
+import { cn } from './ui/utils';
 
 interface BacklogPanelProps {
   tasks: SprintTask[];
@@ -33,11 +22,6 @@ interface BacklogPanelProps {
   onTaskAssignToSprint: (taskId: string, sprintId: string) => void;
   currentSprintId?: string;
 }
-
-type SortField = 'name' | 'priority' | 'assignee' | 'endDate' | 'storyPoints';
-type SortDirection = 'asc' | 'desc';
-
-const PRIORITY_ORDER: SprintTask['priority'][] = ['urgent', 'high', 'medium', 'low', 'none'];
 
 export function BacklogPanel({
   tasks,
@@ -47,8 +31,6 @@ export function BacklogPanel({
 }: BacklogPanelProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortField, setSortField] = useState<SortField>('endDate');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
 
   // Filter unassigned tasks (no sprintId)
@@ -56,59 +38,17 @@ export function BacklogPanel({
     return tasks.filter(task => !task.sprintId);
   }, [tasks]);
 
-  // Filter and sort tasks
-  const filteredAndSortedTasks = useMemo(() => {
-    let filtered = unassignedTasks;
-
-    // Search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(task =>
+  // Apply search filter
+  const filteredTasks = useMemo(() => {
+    if (!searchQuery.trim()) return unassignedTasks;
+    const query = searchQuery.toLowerCase();
+    return unassignedTasks.filter(
+      task =>
         task.name.toLowerCase().includes(query) ||
-        task.description?.toLowerCase().includes(query) ||
-        task.assignee?.toLowerCase().includes(query)
-      );
-    }
-
-    // Sort
-    return [...filtered].sort((a, b) => {
-      let comparison = 0;
-
-      switch (sortField) {
-        case 'name':
-          comparison = a.name.localeCompare(b.name);
-          break;
-        case 'priority':
-          comparison = PRIORITY_ORDER.indexOf(a.priority) - PRIORITY_ORDER.indexOf(b.priority);
-          break;
-        case 'assignee':
-          comparison = (a.assignee || '').localeCompare(b.assignee || '');
-          break;
-        case 'endDate':
-          comparison = new Date(a.endDate).getTime() - new Date(b.endDate).getTime();
-          break;
-        case 'storyPoints':
-          comparison = (a.storyPoints || 0) - (b.storyPoints || 0);
-          break;
-      }
-
-      return sortDirection === 'asc' ? comparison : -comparison;
-    });
-  }, [unassignedTasks, searchQuery, sortField, sortDirection]);
-
-  // Calculate total story points
-  const totalPoints = useMemo(() => {
-    return unassignedTasks.reduce((acc, t) => acc + (t.storyPoints || 0), 0);
-  }, [unassignedTasks]);
-
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortDirection('asc');
-    }
-  };
+        task.assignee?.toLowerCase().includes(query) ||
+        task.description?.toLowerCase().includes(query)
+    );
+  }, [unassignedTasks, searchQuery]);
 
   const handleDragStart = (e: React.DragEvent, task: SprintTask) => {
     e.dataTransfer.setData('application/json', JSON.stringify({
@@ -123,270 +63,160 @@ export function BacklogPanel({
     setDraggedTaskId(null);
   };
 
-  const handleQuickAdd = (taskId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleQuickAdd = (taskId: string) => {
     if (currentSprintId) {
       onTaskAssignToSprint(taskId, currentSprintId);
     }
   };
-
-  const getDaysRemaining = (endDate: Date) => {
-    const diff = new Date(endDate).getTime() - Date.now();
-    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-    return days;
-  };
-
-  const SortableHeader = ({
-    field,
-    children,
-    className,
-  }: {
-    field: SortField;
-    children: React.ReactNode;
-    className?: string;
-  }) => (
-    <TableHead
-      className={cn('cursor-pointer hover:bg-accent/50 select-none', className)}
-      onClick={() => handleSort(field)}
-    >
-      <div className="flex items-center gap-1">
-        {children}
-        {sortField === field ? (
-          sortDirection === 'asc' ? (
-            <ChevronUp className="h-3 w-3" />
-          ) : (
-            <ChevronDown className="h-3 w-3" />
-          )
-        ) : (
-          <ArrowUpDown className="h-3 w-3 opacity-30" />
-        )}
-      </div>
-    </TableHead>
-  );
 
   if (unassignedTasks.length === 0) {
     return null;
   }
 
   return (
-    <TooltipProvider>
+    <div className={cn(
+      'bg-[#1f2023] rounded-lg border border-[#3d3e42]',
+      'transition-all duration-300 ease-out',
+      isExpanded ? 'mb-4' : 'mb-2'
+    )}>
+      {/* Header */}
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className={cn(
+          'w-full flex items-center justify-between px-4 py-3',
+          'hover:bg-[#26272b] transition-colors duration-150',
+          'focus:outline-none rounded-t-lg'
+        )}
+      >
+        <div className="flex items-center gap-3">
+          <div className={cn(
+            'transition-transform duration-200',
+            isExpanded ? 'rotate-90' : ''
+          )}>
+            <ChevronRight className="h-4 w-4 text-[#8b8b8f]" />
+          </div>
+          <Inbox className="h-4 w-4 text-[#8b8b8f]" />
+          <span className="font-medium text-[13px] text-[#e8e8e8]">미할당 백로그</span>
+          <span className="text-[12px] text-[#8b8b8f] ml-0.5">
+            {unassignedTasks.length}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 text-[12px] text-[#8b8b8f]">
+          <span>{unassignedTasks.reduce((acc, t) => acc + (t.storyPoints || 0), 0)} pts</span>
+        </div>
+      </button>
+
+      {/* Content */}
       <div className={cn(
-        'bg-secondary/50 rounded-lg border border-border',
-        'transition-all duration-300',
-        isExpanded ? 'mb-4' : 'mb-3'
+        'overflow-hidden transition-all duration-300 ease-out',
+        isExpanded ? 'max-h-[400px] opacity-100' : 'max-h-0 opacity-0'
       )}>
-        {/* Header */}
-        <button
-          onClick={() => setIsExpanded(!isExpanded)}
-          className={cn(
-            'w-full flex items-center justify-between px-4 py-3',
-            'hover:bg-accent/30 transition-colors duration-150',
-            'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset',
-            isExpanded ? 'rounded-t-lg' : 'rounded-lg'
-          )}
-        >
-          <div className="flex items-center gap-3">
-            <ChevronRight className={cn(
-              'h-4 w-4 text-muted-foreground transition-transform duration-200',
-              isExpanded && 'rotate-90'
-            )} />
-            <div className="flex items-center gap-2">
-              <Inbox className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium text-foreground">
-                미할당 백로그
-              </span>
-            </div>
-            <Badge variant="secondary" className="h-5 min-w-5 px-1.5 text-[10px] font-medium rounded-full">
-              {unassignedTasks.length}
-            </Badge>
+        <div className="px-4 pb-3 space-y-3">
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#5c5c5f]" />
+            <Input
+              placeholder="태스크 검색..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-8 h-8 text-[13px] bg-[#26272b] border-[#3d3e42] text-[#e8e8e8] placeholder:text-[#5c5c5f]"
+            />
           </div>
 
-          <div className="flex items-center gap-3">
-            {totalPoints > 0 && (
-              <Badge variant="outline" className="h-5 text-[10px] font-normal">
-                {totalPoints} pts
-              </Badge>
+          {/* Task List */}
+          <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1 scrollbar-thin">
+            {filteredTasks.map((task, index) => (
+              <div
+                key={task.id}
+                draggable
+                onDragStart={(e) => handleDragStart(e, task)}
+                onDragEnd={handleDragEnd}
+                onClick={() => onTaskClick(task)}
+                className={cn(
+                  'group relative bg-[#1f2023] hover:bg-[#26272b] rounded-md p-3 cursor-grab active:cursor-grabbing',
+                  'transition-all duration-150 border border-transparent hover:border-[#3d3e42]',
+                  draggedTaskId === task.id && 'opacity-40 scale-[0.98]'
+                )}
+              >
+                {/* Drag Handle */}
+                <div className="absolute top-3 left-1 opacity-0 group-hover:opacity-60 transition-opacity">
+                  <GripVertical className="h-3.5 w-3.5 text-[#5c5c5f]" />
+                </div>
+
+                {/* Content */}
+                <div className="ml-4">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <div
+                      className="w-1 h-4 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: task.color }}
+                    />
+                    <span className="text-[13px] text-[#e8e8e8] truncate">{task.name}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {task.priority && task.priority !== 'none' && (
+                        <PriorityBadge priority={task.priority} size="xs" />
+                      )}
+                      {task.storyPoints && task.storyPoints > 0 && (
+                        <span className="text-[10px] text-[#8b8b8f] bg-[#2d2e32] px-1.5 py-0.5 rounded">
+                          {task.storyPoints}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {task.assignee && (
+                        task.assigneeAvatarUrl ? (
+                          <img
+                            src={task.assigneeAvatarUrl}
+                            alt={task.assignee}
+                            className="w-5 h-5 rounded-full"
+                          />
+                        ) : (
+                          <div className="w-5 h-5 rounded-full bg-[#5e6ad2] flex items-center justify-center text-[10px] text-white font-medium">
+                            {task.assignee.charAt(0).toUpperCase()}
+                          </div>
+                        )
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick Add Button */}
+                {currentSprintId && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleQuickAdd(task.id);
+                    }}
+                    className={cn(
+                      'absolute top-2 right-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100',
+                      'transition-all duration-150',
+                      'hover:bg-[#3d3e42] text-[#8b8b8f] hover:text-[#e8e8e8]'
+                    )}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            ))}
+
+            {filteredTasks.length === 0 && searchQuery && (
+              <div className="text-center py-4 text-[13px] text-[#5c5c5f]">
+                검색 결과 없음
+              </div>
             )}
           </div>
-        </button>
 
-        {/* Content */}
-        <div className={cn(
-          'overflow-hidden transition-all duration-300',
-          isExpanded ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'
-        )}>
-          <div className="px-4 pb-4 space-y-3">
-            {/* Search Bar */}
-            <div className="relative max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="이슈 검색..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 h-9"
-              />
+          {/* Hint */}
+          {filteredTasks.length > 0 && currentSprintId && (
+            <div className="text-[11px] text-[#5c5c5f] text-center pt-1">
+              드래그하거나 <Plus className="inline h-3 w-3" /> 버튼으로 스프린트에 추가
             </div>
-
-            {/* Table */}
-            <div className="rounded-lg border bg-card max-h-[400px] overflow-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="w-10"></TableHead>
-                    <SortableHeader field="name" className="min-w-[200px]">
-                      이슈
-                    </SortableHeader>
-                    <SortableHeader field="priority" className="w-[100px]">
-                      우선순위
-                    </SortableHeader>
-                    <SortableHeader field="assignee" className="w-[120px]">
-                      담당자
-                    </SortableHeader>
-                    <SortableHeader field="endDate" className="w-[100px]">
-                      마감일
-                    </SortableHeader>
-                    <SortableHeader field="storyPoints" className="w-[80px]">
-                      포인트
-                    </SortableHeader>
-                    {currentSprintId && <TableHead className="w-10"></TableHead>}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredAndSortedTasks.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={currentSprintId ? 7 : 6} className="h-24 text-center text-muted-foreground">
-                        {searchQuery ? '검색 결과가 없습니다' : '미할당 이슈가 없습니다'}
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredAndSortedTasks.map((task) => {
-                      const daysRemaining = getDaysRemaining(task.endDate);
-                      const isOverdue = daysRemaining < 0;
-                      const isSoon = daysRemaining >= 0 && daysRemaining <= 3;
-                      const isDragging = draggedTaskId === task.id;
-
-                      return (
-                        <TableRow
-                          key={task.id}
-                          draggable
-                          onDragStart={(e) => handleDragStart(e, task)}
-                          onDragEnd={handleDragEnd}
-                          className={cn(
-                            'cursor-pointer group',
-                            isDragging && 'opacity-50'
-                          )}
-                          onClick={() => onTaskClick(task)}
-                        >
-                          <TableCell>
-                            <div
-                              className="w-1.5 h-6 rounded-full"
-                              style={{ backgroundColor: task.color }}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium truncate">{task.name}</span>
-                              {task.linearIssueId && (
-                                <Badge variant="outline" className="text-[10px] shrink-0">
-                                  Linear
-                                </Badge>
-                              )}
-                            </div>
-                            {task.labels && task.labels.length > 0 && (
-                              <div className="flex gap-1 mt-1">
-                                {task.labels.slice(0, 2).map((label, i) => (
-                                  <span
-                                    key={i}
-                                    className="text-[10px] px-1.5 py-0.5 rounded bg-accent text-muted-foreground"
-                                  >
-                                    {typeof label === 'object' ? label.name : label}
-                                  </span>
-                                ))}
-                                {task.labels.length > 2 && (
-                                  <span className="text-[10px] text-muted-foreground">
-                                    +{task.labels.length - 2}
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <PriorityBadge priority={task.priority} size="sm" />
-                          </TableCell>
-                          <TableCell>
-                            {task.assignee ? (
-                              <div className="flex items-center gap-2">
-                                <Avatar className="h-6 w-6">
-                                  <AvatarFallback className="text-[10px]">
-                                    {task.assignee.slice(0, 2).toUpperCase()}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <span className="text-xs truncate hidden sm:inline">
-                                  {task.assignee}
-                                </span>
-                              </div>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">-</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <span
-                              className={cn(
-                                'text-xs',
-                                isOverdue && 'text-red-500 font-medium',
-                                isSoon && !isOverdue && 'text-orange-500'
-                              )}
-                            >
-                              {format(task.endDate, 'M/d', { locale: ko })}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            {task.storyPoints !== undefined && task.storyPoints > 0 ? (
-                              <span className="text-xs text-muted-foreground">
-                                {task.storyPoints}
-                              </span>
-                            ) : (
-                              <span className="text-xs text-muted-foreground/50">-</span>
-                            )}
-                          </TableCell>
-                          {currentSprintId && (
-                            <TableCell onClick={(e) => e.stopPropagation()}>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 opacity-0 group-hover:opacity-100"
-                                    onClick={(e) => handleQuickAdd(task.id, e)}
-                                  >
-                                    <ArrowUpRight className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>스프린트에 추가</TooltipContent>
-                              </Tooltip>
-                            </TableCell>
-                          )}
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-
-            {/* Footer */}
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>
-                총 {filteredAndSortedTasks.length}개 이슈
-                {searchQuery ? ` (전체 ${unassignedTasks.length}개 중)` : ''}
-              </span>
-              {currentSprintId && (
-                <span>드래그하여 스프린트에 추가</span>
-              )}
-            </div>
-          </div>
+          )}
         </div>
       </div>
-    </TooltipProvider>
+    </div>
   );
 }

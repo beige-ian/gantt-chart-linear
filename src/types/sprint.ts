@@ -37,6 +37,10 @@ export interface SprintTask {
   // Linear relations (dependencies)
   linearBlocks?: string[];    // Linear issue IDs this task blocks
   linearBlockedBy?: string[]; // Linear issue IDs blocking this task
+  // Team information for color coding
+  teamId?: string;
+  teamName?: string;
+  teamIcon?: string;
 }
 
 export interface SprintStats {

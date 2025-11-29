@@ -1,7 +1,64 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useMemo } from 'react';
 import { Task } from './GanttChart';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { User, Flag } from 'lucide-react';
+
+// Team color palette - distinct colors for different teams
+const TEAM_COLORS: Record<string, string> = {
+  // Common team identifiers with distinct colors
+  'engineering': '#3b82f6',  // Blue
+  'design': '#8b5cf6',       // Purple
+  'product': '#10b981',      // Green
+  'marketing': '#f59e0b',    // Amber
+  'sales': '#ef4444',        // Red
+  'support': '#06b6d4',      // Cyan
+  'ops': '#f97316',          // Orange
+  'data': '#6366f1',         // Indigo
+  'qa': '#14b8a6',           // Teal
+  'devops': '#ec4899',       // Pink
+};
+
+// Fallback colors for teams without a predefined color
+const FALLBACK_TEAM_COLORS = [
+  '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+  '#06b6d4', '#f97316', '#6366f1', '#14b8a6', '#ec4899',
+  '#84cc16', '#a855f7', '#22c55e', '#eab308', '#0ea5e9',
+];
+
+// Cache for team ID to color mapping
+const teamColorCache: Map<string, string> = new Map();
+
+// Get color for team ID - consistent across renders
+function getTeamColor(teamId: string | undefined, teamName: string | undefined): string | undefined {
+  if (!teamId) return undefined;
+
+  // Check cache first
+  if (teamColorCache.has(teamId)) {
+    return teamColorCache.get(teamId);
+  }
+
+  // Try to match by team name (lowercase, remove spaces)
+  if (teamName) {
+    const normalizedName = teamName.toLowerCase().replace(/\s+/g, '');
+    for (const [key, color] of Object.entries(TEAM_COLORS)) {
+      if (normalizedName.includes(key) || key.includes(normalizedName)) {
+        teamColorCache.set(teamId, color);
+        return color;
+      }
+    }
+  }
+
+  // Generate consistent color from team ID hash
+  let hash = 0;
+  for (let i = 0; i < teamId.length; i++) {
+    hash = ((hash << 5) - hash) + teamId.charCodeAt(i);
+    hash = hash & hash;
+  }
+  const colorIndex = Math.abs(hash) % FALLBACK_TEAM_COLORS.length;
+  const color = FALLBACK_TEAM_COLORS[colorIndex];
+  teamColorCache.set(teamId, color);
+  return color;
+}
 
 interface TaskBarProps {
   task: Task;
@@ -156,7 +213,7 @@ export function TaskBar({
         // Don't allow start date to go past end date (minimum 1 day)
         const minDate = new Date(task.endDate);
         minDate.setDate(minDate.getDate() - 1);
-        if (newStartDate < minDate) {
+        if (newStartDate <= minDate) {
           onDateChange(task.id, newStartDate, task.endDate);
           updateDragGuide(newStartDate, task.endDate);
         }
@@ -205,7 +262,7 @@ export function TaskBar({
         // Don't allow end date to go before start date (minimum 1 day)
         const minDate = new Date(task.startDate);
         minDate.setDate(minDate.getDate() + 1);
-        if (newEndDate > minDate) {
+        if (newEndDate >= minDate) {
           onDateChange(task.id, task.startDate, newEndDate);
           updateDragGuide(task.startDate, newEndDate);
         }
@@ -254,6 +311,17 @@ export function TaskBar({
 
   const isActive = isDragging || isResizingLeft || isResizingRight;
 
+  // Determine the display color - use team color for projects (parent tasks)
+  const displayColor = useMemo(() => {
+    // For projects (tasks without parentId), use team-based color if available
+    if (!task.parentId && task.teamId) {
+      const teamColor = getTeamColor(task.teamId, task.teamName);
+      if (teamColor) return teamColor;
+    }
+    // Fall back to task's own color
+    return task.color;
+  }, [task.parentId, task.teamId, task.teamName, task.color]);
+
   // Calculate duration days for tooltip
   const durationDays = Math.max(1, Math.ceil((task.endDate.getTime() - task.startDate.getTime()) / (1000 * 60 * 60 * 24)));
 
@@ -269,7 +337,7 @@ export function TaskBar({
       <div className="flex items-center gap-2">
         <div
           className="w-2 h-2 rounded-full flex-shrink-0"
-          style={{ backgroundColor: task.color }}
+          style={{ backgroundColor: displayColor }}
         />
         <span className="font-semibold text-sm text-foreground truncate">{task.name}</span>
       </div>
@@ -293,11 +361,22 @@ export function TaskBar({
           <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
             <div
               className="h-full rounded-full"
-              style={{ width: `${task.progress}%`, backgroundColor: task.color }}
+              style={{ width: `${task.progress}%`, backgroundColor: displayColor }}
             />
           </div>
           <span className="text-foreground font-semibold tabular-nums">{task.progress}%</span>
         </div>
+
+        {/* Team indicator for projects */}
+        {task.teamName && !task.parentId && (
+          <div className="flex items-center gap-1.5 text-muted-foreground pt-0.5">
+            <div
+              className="w-2 h-2 rounded-sm"
+              style={{ backgroundColor: displayColor }}
+            />
+            <span className="text-[10px]">{task.teamName}</span>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -318,7 +397,7 @@ export function TaskBar({
 
   // Generate clean, minimal bar style
   const getBarStyle = () => {
-    const baseColor = task.color;
+    const baseColor = displayColor;
     return {
       left: `${leftPosition}%`,
       width: `${width}%`,
@@ -392,24 +471,24 @@ export function TaskBar({
       {/* Left Resize Handle */}
       {onDateChange && !task.isMilestone && (
         <div
-          className="absolute top-0 bottom-0 w-2 cursor-ew-resize z-30 touch-none opacity-0 group-hover/bar:opacity-100 transition-opacity"
-          style={{ left: '0px' }}
+          className="absolute top-0 bottom-0 w-4 cursor-ew-resize z-30 touch-none"
+          style={{ left: '-4px' }}
           onMouseDown={handleResizeLeftStart}
           onTouchStart={handleResizeLeftStart}
         >
-          <div className="absolute inset-y-1 left-0.5 w-1 bg-white/80 rounded-full shadow-sm" />
+          <div className="absolute inset-y-1 left-1.5 w-1.5 bg-white/60 hover:bg-white rounded-full shadow-sm transition-colors" />
         </div>
       )}
 
       {/* Right Resize Handle */}
       {onDateChange && !task.isMilestone && (
         <div
-          className="absolute top-0 bottom-0 w-2 cursor-ew-resize z-30 touch-none opacity-0 group-hover/bar:opacity-100 transition-opacity"
-          style={{ right: '0px' }}
+          className="absolute top-0 bottom-0 w-4 cursor-ew-resize z-30 touch-none"
+          style={{ right: '-4px' }}
           onMouseDown={handleResizeRightStart}
           onTouchStart={handleResizeRightStart}
         >
-          <div className="absolute inset-y-1 right-0.5 w-1 bg-white/80 rounded-full shadow-sm" />
+          <div className="absolute inset-y-1 right-1.5 w-1.5 bg-white/60 hover:bg-white rounded-full shadow-sm transition-colors" />
         </div>
       )}
     </div>

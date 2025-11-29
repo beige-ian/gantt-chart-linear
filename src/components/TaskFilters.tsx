@@ -106,11 +106,11 @@ export function TaskFilters({
       {/* Filter Popover */}
       <Popover>
         <PopoverTrigger asChild>
-          <Button variant="outline" size="sm" className="gap-2">
+          <Button variant="outline" size="sm" className="gap-2 transition-all duration-150 hover:shadow-sm hover:border-primary/30 active:scale-[0.98]">
             <Filter className="h-4 w-4" />
             <span className="hidden sm:inline">필터</span>
             {activeFilterCount > 0 && (
-              <span className="px-1.5 py-0.5 text-xs bg-primary text-primary-foreground rounded-full">
+              <span className="px-1.5 py-0.5 text-xs bg-primary text-primary-foreground rounded-full animate-in fade-in-50 zoom-in-95 duration-200">
                 {activeFilterCount}
               </span>
             )}
@@ -231,12 +231,12 @@ export function TaskFilters({
           value={sort.field}
           onValueChange={(value) => onSortChange({ ...sort, field: value as TaskSortOptions['field'] })}
         >
-          <SelectTrigger className="h-9 w-32 sm:w-36">
+          <SelectTrigger className="h-9 w-32 sm:w-36 transition-all duration-150 hover:border-primary/30">
             <SelectValue placeholder="정렬" />
           </SelectTrigger>
           <SelectContent>
             {Object.entries(sortFieldLabels).map(([value, label]) => (
-              <SelectItem key={value} value={value}>
+              <SelectItem key={value} value={value} className="transition-colors duration-100">
                 {label}
               </SelectItem>
             ))}
@@ -245,7 +245,7 @@ export function TaskFilters({
         <Button
           variant="outline"
           size="icon"
-          className="h-9 w-9"
+          className="h-9 w-9 transition-all duration-150 hover:shadow-sm hover:border-primary/30 active:scale-95"
           onClick={() =>
             onSortChange({
               ...sort,
@@ -254,9 +254,9 @@ export function TaskFilters({
           }
         >
           {sort.direction === 'asc' ? (
-            <SortAsc className="h-4 w-4" />
+            <SortAsc className="h-4 w-4 transition-transform duration-200" />
           ) : (
-            <SortDesc className="h-4 w-4" />
+            <SortDesc className="h-4 w-4 transition-transform duration-200" />
           )}
         </Button>
       </div>

@@ -1,20 +1,17 @@
-import React, { useState, useRef, useCallback, useEffect, useMemo, memo } from 'react';
-import { Card } from './ui/card';
+import React, { useState, useRef, useCallback, useMemo } from 'react';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
-import { Progress } from './ui/progress';
 import {
   MoreHorizontal,
-  Clock,
-  User,
-  AlertCircle,
-  Link,
-  GripVertical,
+  Plus,
   ChevronRight,
+  ChevronDown,
   CheckCircle2,
   Circle,
-  Timer,
-  Search as SearchIcon,
+  Clock,
+  AlertTriangle,
+  Loader2,
+  Inbox,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -23,125 +20,111 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
-import { SprintTask, STATUS_LABELS, PRIORITY_COLORS, PRIORITY_LABELS } from '../types/sprint';
+import { SprintTask, STATUS_LABELS, PRIORITY_COLORS } from '../types/sprint';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
-import { PriorityBadge } from './ui/status-badge';
 
 interface SprintBoardProps {
   tasks: SprintTask[];
   onTaskClick: (task: SprintTask) => void;
   onStatusChange: (taskId: string, status: SprintTask['status']) => void;
   onDeleteTask: (taskId: string) => void;
-  onTaskDropFromBacklog?: (taskId: string) => void;
+  onTaskDropFromBacklog?: (taskId: string, status: SprintTask['status']) => void;
+  onUnassignFromSprint?: (taskId: string) => void;
 }
 
 const COLUMNS: SprintTask['status'][] = ['backlog', 'todo', 'in_progress', 'in_review', 'done'];
 
-// Status icons with semantic colors from design tokens
+// Linear-style status icons
 const STATUS_ICONS: Record<SprintTask['status'], React.ReactNode> = {
-  backlog: <Circle className="h-4 w-4 text-status-backlog" />,
-  todo: <Circle className="h-4 w-4 text-status-todo" strokeWidth={2.5} />,
-  in_progress: <Timer className="h-4 w-4 text-status-in-progress" />,
-  in_review: <SearchIcon className="h-4 w-4 text-status-in-review" />,
-  done: <CheckCircle2 className="h-4 w-4 text-status-done" />,
+  backlog: <Circle className="h-[14px] w-[14px] text-[#95959f]" strokeWidth={1.5} />,
+  todo: <Circle className="h-[14px] w-[14px] text-[#e2e2e3]" strokeWidth={2} />,
+  in_progress: <Loader2 className="h-[14px] w-[14px] text-[#f2c94c]" />,
+  in_review: <AlertTriangle className="h-[14px] w-[14px] text-[#bb87fc]" />,
+  done: <CheckCircle2 className="h-[14px] w-[14px] text-[#4da568]" />,
 };
 
-// Column header border colors using design tokens
-const COLUMN_COLORS: Record<SprintTask['status'], string> = {
-  backlog: 'border-l-4 border-l-status-backlog',
-  todo: 'border-l-4 border-l-status-todo',
-  in_progress: 'border-l-4 border-l-status-in-progress',
-  in_review: 'border-l-4 border-l-status-in-review',
-  done: 'border-l-4 border-l-status-done',
+// Linear-style column labels
+const LINEAR_STATUS_LABELS: Record<SprintTask['status'], string> = {
+  backlog: 'Backlog',
+  todo: 'Todo',
+  in_progress: 'In Progress',
+  in_review: 'In Review',
+  done: 'Done',
 };
 
-// Status colors from design tokens (for inline styles where needed)
-const STATUS_DOT_COLORS: Record<SprintTask['status'], string> = {
-  backlog: 'var(--status-backlog)',
-  todo: 'var(--status-todo)',
-  in_progress: 'var(--status-in-progress)',
-  in_review: 'var(--status-in-review)',
-  done: 'var(--status-done)',
+// Priority icons
+const PRIORITY_ICONS: Record<SprintTask['priority'], React.ReactNode> = {
+  urgent: <div className="w-3 h-3 rounded-sm bg-[#f2994a] flex items-center justify-center"><span className="text-[8px] text-white font-bold">!</span></div>,
+  high: <div className="w-3 h-3 rounded-sm bg-[#eb5757] flex items-center justify-center"><span className="text-[8px] text-white font-bold">↑</span></div>,
+  medium: <div className="w-3 h-3 rounded-sm bg-[#f2c94c] flex items-center justify-center"><span className="text-[8px] text-black font-bold">−</span></div>,
+  low: <div className="w-3 h-3 rounded-sm bg-[#6fcf97] flex items-center justify-center"><span className="text-[8px] text-white font-bold">↓</span></div>,
+  none: null,
 };
 
-export function SprintBoard({ tasks, onTaskClick, onStatusChange, onDeleteTask, onTaskDropFromBacklog }: SprintBoardProps) {
+export function SprintBoard({ tasks, onTaskClick, onStatusChange, onDeleteTask, onTaskDropFromBacklog, onUnassignFromSprint }: SprintBoardProps) {
   const [draggedTask, setDraggedTask] = useState<SprintTask | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<SprintTask['status'] | null>(null);
-  const [touchStartY, setTouchStartY] = useState<number | null>(null);
-  const [touchedTask, setTouchedTask] = useState<SprintTask | null>(null);
-  const [focusedTaskId, setFocusedTaskId] = useState<string | null>(null);
-  const taskRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
 
-  // Memoized task grouping by status
-  const tasksByStatus = useMemo(() => {
-    const grouped: Record<SprintTask['status'], SprintTask[]> = {
-      backlog: [],
-      todo: [],
-      in_progress: [],
-      in_review: [],
-      done: [],
+  // Group tasks by status and then by project
+  const tasksByStatusAndProject = useMemo(() => {
+    const grouped: Record<SprintTask['status'], Map<string, SprintTask[]>> = {
+      backlog: new Map(),
+      todo: new Map(),
+      in_progress: new Map(),
+      in_review: new Map(),
+      done: new Map(),
     };
+
     tasks.forEach(task => {
-      grouped[task.status].push(task);
+      const projectKey = task.parentId || task.linearParentIssueId || '__no_project__';
+      const statusMap = grouped[task.status];
+      if (!statusMap.has(projectKey)) {
+        statusMap.set(projectKey, []);
+      }
+      statusMap.get(projectKey)!.push(task);
     });
+
     return grouped;
   }, [tasks]);
 
-  const getTasksByStatus = useCallback((status: SprintTask['status']) => {
-    return tasksByStatus[status];
-  }, [tasksByStatus]);
+  // Get project info from tasks
+  const projectInfo = useMemo(() => {
+    const info: Record<string, { name: string; color: string }> = {};
+    tasks.forEach(task => {
+      if (!task.parentId && task.linearProjectId) {
+        // This is a project-level task
+        info[task.id] = { name: task.name, color: task.color };
+      }
+    });
+    return info;
+  }, [tasks]);
 
-  // Memoized column stats
+  // Column stats
   const columnStats = useMemo(() => {
-    const stats: Record<SprintTask['status'], { count: number; points: number; completedPoints: number }> = {} as any;
-    COLUMNS.forEach(status => {
-      const columnTasks = tasksByStatus[status];
-      const points = columnTasks.reduce((acc, t) => acc + (t.storyPoints || 0), 0);
-      stats[status] = {
-        count: columnTasks.length,
-        points,
-        completedPoints: status === 'done' ? points : 0,
-      };
+    const stats: Record<SprintTask['status'], number> = {
+      backlog: 0,
+      todo: 0,
+      in_progress: 0,
+      in_review: 0,
+      done: 0,
+    };
+    tasks.forEach(task => {
+      stats[task.status]++;
     });
     return stats;
-  }, [tasksByStatus]);
+  }, [tasks]);
 
-  const getColumnStats = useCallback((status: SprintTask['status']) => {
-    return columnStats[status];
-  }, [columnStats]);
-
-  // Memoized total stats
-  const totalStats = useMemo(() => {
-    const totalTasks = tasks.length;
-    const doneTasks = tasksByStatus.done.length;
-    const totalPoints = tasks.reduce((acc, t) => acc + (t.storyPoints || 0), 0);
-    const donePoints = tasksByStatus.done.reduce((acc, t) => acc + (t.storyPoints || 0), 0);
-    return {
-      totalTasks,
-      doneTasks,
-      totalPoints,
-      donePoints,
-      progressPercent: totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0,
-      pointsProgressPercent: totalPoints > 0 ? Math.round((donePoints / totalPoints) * 100) : 0,
-    };
-  }, [tasks, tasksByStatus.done]);
-
-  const getTotalStats = useCallback(() => totalStats, [totalStats]);
-
-  // Drag and Drop handlers
+  // Drag handlers
   const handleDragStart = (e: React.DragEvent, task: SprintTask) => {
     setDraggedTask(task);
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', task.id);
-
-    // Add drag image
-    const dragElement = e.currentTarget as HTMLElement;
-    dragElement.style.opacity = '0.5';
+    (e.currentTarget as HTMLElement).style.opacity = '0.4';
   };
 
   const handleDragEnd = (e: React.DragEvent) => {
-    const dragElement = e.currentTarget as HTMLElement;
-    dragElement.style.opacity = '1';
+    (e.currentTarget as HTMLElement).style.opacity = '1';
     setDraggedTask(null);
     setDragOverColumn(null);
   };
@@ -152,35 +135,22 @@ export function SprintBoard({ tasks, onTaskClick, onStatusChange, onDeleteTask, 
     setDragOverColumn(status);
   };
 
-  const handleDragLeave = (e: React.DragEvent) => {
-    // Only clear if leaving the column completely
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    if (
-      e.clientX < rect.left ||
-      e.clientX > rect.right ||
-      e.clientY < rect.top ||
-      e.clientY > rect.bottom
-    ) {
-      setDragOverColumn(null);
-    }
-  };
-
   const handleDrop = (e: React.DragEvent, status: SprintTask['status']) => {
     e.preventDefault();
 
-    // Check if this is a drop from the backlog panel
     try {
       const dataStr = e.dataTransfer.getData('application/json');
       if (dataStr) {
         const data = JSON.parse(dataStr);
         if (data.source === 'backlog' && data.taskId && onTaskDropFromBacklog) {
-          onTaskDropFromBacklog(data.taskId);
+          // Pass both taskId and the target status
+          onTaskDropFromBacklog(data.taskId, status);
           setDragOverColumn(null);
           return;
         }
       }
     } catch (err) {
-      // Not JSON data, continue with normal drop
+      // Not JSON data
     }
 
     if (draggedTask && draggedTask.status !== status) {
@@ -190,430 +160,279 @@ export function SprintBoard({ tasks, onTaskClick, onStatusChange, onDeleteTask, 
     setDragOverColumn(null);
   };
 
-  // Touch handlers for mobile
-  const handleTouchStart = (e: React.TouchEvent, task: SprintTask) => {
-    setTouchStartY(e.touches[0].clientY);
-    setTouchedTask(task);
+  const toggleProjectCollapse = (projectId: string) => {
+    setCollapsedProjects(prev => {
+      const next = new Set(prev);
+      if (next.has(projectId)) {
+        next.delete(projectId);
+      } else {
+        next.add(projectId);
+      }
+      return next;
+    });
   };
 
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (!touchStartY || !touchedTask) return;
-
-    const currentY = e.touches[0].clientY;
-    const diff = Math.abs(currentY - touchStartY);
-
-    // If moved enough, consider it a drag
-    if (diff > 20) {
-      setDraggedTask(touchedTask);
-
-      // Find which column we're over
-      const touch = e.touches[0];
-      const columns = document.querySelectorAll('[data-column]');
-      columns.forEach((col) => {
-        const rect = col.getBoundingClientRect();
-        if (
-          touch.clientX >= rect.left &&
-          touch.clientX <= rect.right &&
-          touch.clientY >= rect.top &&
-          touch.clientY <= rect.bottom
-        ) {
-          const status = col.getAttribute('data-column') as SprintTask['status'];
-          setDragOverColumn(status);
-        }
-      });
-    }
+  const getProjectName = (projectId: string): string => {
+    if (projectId === '__no_project__') return '';
+    const project = tasks.find(t => t.id === projectId || t.linearIssueId === projectId);
+    return project?.name || projectId;
   };
 
-  const handleTouchEnd = () => {
-    if (draggedTask && dragOverColumn && draggedTask.status !== dragOverColumn) {
-      onStatusChange(draggedTask.id, dragOverColumn);
-    }
-    setTouchStartY(null);
-    setTouchedTask(null);
-    setDraggedTask(null);
-    setDragOverColumn(null);
-  };
+  const renderTaskCard = (task: SprintTask, status: SprintTask['status']) => {
+    const isDragging = draggedTask?.id === task.id;
+    const issueId = task.linearIssueId ? `${task.linearIssueId.slice(-6).toUpperCase()}` : '';
 
-  // Keyboard navigation
-  const handleKeyDown = useCallback((e: React.KeyboardEvent, task: SprintTask) => {
-    const currentColumnIndex = COLUMNS.indexOf(task.status);
+    return (
+      <div
+        key={task.id}
+        draggable
+        onDragStart={(e) => handleDragStart(e, task)}
+        onDragEnd={handleDragEnd}
+        onClick={() => onTaskClick(task)}
+        className={`
+          group relative bg-[#1f2023] hover:bg-[#26272b] rounded-md p-3 cursor-pointer
+          transition-all duration-150 border border-transparent hover:border-[#3d3e42]
+          ${isDragging ? 'opacity-40 scale-[0.98]' : ''}
+        `}
+      >
+        {/* Issue ID & Parent Project */}
+        <div className="flex items-center gap-2 text-[11px] text-[#8b8b8f] mb-1.5">
+          {issueId && <span>{issueId}</span>}
+          {task.parentId && (
+            <>
+              <span className="text-[#5c5c5f]">›</span>
+              <span className="truncate">{getProjectName(task.parentId)}</span>
+            </>
+          )}
+        </div>
 
-    switch (e.key) {
-      case 'ArrowRight':
-        e.preventDefault();
-        if (currentColumnIndex < COLUMNS.length - 1) {
-          onStatusChange(task.id, COLUMNS[currentColumnIndex + 1]);
-        }
-        break;
-      case 'ArrowLeft':
-        e.preventDefault();
-        if (currentColumnIndex > 0) {
-          onStatusChange(task.id, COLUMNS[currentColumnIndex - 1]);
-        }
-        break;
-      case 'Enter':
-      case ' ':
-        e.preventDefault();
-        onTaskClick(task);
-        break;
-      case 'Delete':
-      case 'Backspace':
-        if (e.metaKey || e.ctrlKey) {
-          e.preventDefault();
-          onDeleteTask(task.id);
-        }
-        break;
-    }
-  }, [onStatusChange, onTaskClick, onDeleteTask]);
+        {/* Status icon + Title */}
+        <div className="flex items-start gap-2">
+          <div className="mt-0.5 shrink-0">
+            {task.status === 'done' ? (
+              <CheckCircle2 className="h-4 w-4 text-[#4da568]" />
+            ) : (
+              <Circle className="h-4 w-4 text-[#5c5c5f]" strokeWidth={1.5} />
+            )}
+          </div>
+          <span className={`text-[13px] leading-snug ${task.status === 'done' ? 'text-[#8b8b8f] line-through' : 'text-[#e8e8e8]'}`}>
+            {task.name}
+          </span>
+        </div>
 
-  // Quick action: move to next status
-  const moveToNextStatus = (task: SprintTask, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const currentIndex = COLUMNS.indexOf(task.status);
-    if (currentIndex < COLUMNS.length - 1) {
-      onStatusChange(task.id, COLUMNS[currentIndex + 1]);
-    }
-  };
+        {/* Priority & Assignee row */}
+        <div className="flex items-center justify-between mt-2.5">
+          <div className="flex items-center gap-2">
+            {/* Priority */}
+            {task.priority && task.priority !== 'none' && PRIORITY_ICONS[task.priority]}
 
-  const getPriorityIcon = (priority: SprintTask['priority']) => {
-    if (priority === 'urgent' || priority === 'high') {
-      return <AlertCircle className="h-3.5 w-3.5" style={{ color: PRIORITY_COLORS[priority] }} />;
-    }
-    return null;
-  };
+            {/* Story Points */}
+            {task.storyPoints && task.storyPoints > 0 && (
+              <span className="text-[10px] text-[#8b8b8f] bg-[#2d2e32] px-1.5 py-0.5 rounded">
+                {task.storyPoints}
+              </span>
+            )}
+          </div>
 
-  const formatDueDate = (date: Date) => {
-    const now = new Date();
-    const diff = date.getTime() - now.getTime();
-    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+          {/* Assignee */}
+          {task.assignee && (
+            <div className="flex items-center gap-1.5">
+              {task.assigneeAvatarUrl ? (
+                <img
+                  src={task.assigneeAvatarUrl}
+                  alt={task.assignee}
+                  className="w-5 h-5 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-5 h-5 rounded-full bg-[#5e6ad2] flex items-center justify-center text-[10px] text-white font-medium">
+                  {task.assignee.charAt(0).toUpperCase()}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
-    if (days < 0) return { text: `${Math.abs(days)}일 지남`, isOverdue: true, isSoon: false };
-    if (days === 0) return { text: '오늘 마감', isOverdue: false, isSoon: true };
-    if (days === 1) return { text: '내일 마감', isOverdue: false, isSoon: true };
-    if (days <= 3) return { text: `${days}일 남음`, isOverdue: false, isSoon: true };
-    return { text: `${days}일 남음`, isOverdue: false, isSoon: false };
+        {/* More menu (visible on hover) */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="absolute top-2 right-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 hover:bg-[#3d3e42] transition-opacity"
+            >
+              <MoreHorizontal className="h-4 w-4 text-[#8b8b8f]" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48 bg-[#1f2023] border-[#3d3e42]">
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onTaskClick(task); }} className="text-[#e8e8e8] focus:bg-[#2d2e32]">
+              수정
+            </DropdownMenuItem>
+            <DropdownMenuSeparator className="bg-[#3d3e42]" />
+            {COLUMNS.filter(s => s !== status).map(s => (
+              <DropdownMenuItem
+                key={s}
+                onClick={(e) => { e.stopPropagation(); onStatusChange(task.id, s); }}
+                className="text-[#e8e8e8] focus:bg-[#2d2e32]"
+              >
+                <span className="flex items-center gap-2">
+                  {STATUS_ICONS[s]}
+                  {LINEAR_STATUS_LABELS[s]}로 이동
+                </span>
+              </DropdownMenuItem>
+            ))}
+            {onUnassignFromSprint && (
+              <>
+                <DropdownMenuSeparator className="bg-[#3d3e42]" />
+                <DropdownMenuItem
+                  onClick={(e) => { e.stopPropagation(); onUnassignFromSprint(task.id); }}
+                  className="text-[#e8e8e8] focus:bg-[#2d2e32]"
+                >
+                  <span className="flex items-center gap-2">
+                    <Inbox className="h-4 w-4" />
+                    백로그로 이동
+                  </span>
+                </DropdownMenuItem>
+              </>
+            )}
+            <DropdownMenuSeparator className="bg-[#3d3e42]" />
+            <DropdownMenuItem
+              className="text-[#eb5757] focus:bg-[#2d2e32] focus:text-[#eb5757]"
+              onClick={(e) => { e.stopPropagation(); onDeleteTask(task.id); }}
+            >
+              삭제
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* Project tag at bottom */}
+        {task.parentId && (
+          <div className="mt-2.5 flex items-center gap-1.5">
+            <div
+              className="w-3 h-3 rounded flex items-center justify-center text-[8px]"
+              style={{ backgroundColor: projectInfo[task.parentId]?.color || '#5e6ad2' }}
+            >
+              <span className="text-white">●</span>
+            </div>
+            <span className="text-[11px] text-[#8b8b8f] truncate">
+              {getProjectName(task.parentId)}
+            </span>
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
     <TooltipProvider>
-      <div className="space-y-4">
-        {/* Overall Progress Bar - Notion style */}
-        {tasks.length > 0 && (
-          <div className="bg-secondary/50 rounded-lg p-4 border border-border">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-medium text-foreground">진행률</span>
-                <div className="flex items-center gap-1.5">
-                  {COLUMNS.map(status => (
-                    <Tooltip key={status}>
-                      <TooltipTrigger asChild>
-                        <div
-                          className="w-2.5 h-2.5 rounded-full cursor-help"
-                          style={{ backgroundColor: STATUS_DOT_COLORS[status] }}
-                        />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        {STATUS_LABELS[status]}: {columnStats[status].count}
-                      </TooltipContent>
-                    </Tooltip>
-                  ))}
-                </div>
-              </div>
-              <span className="text-sm font-medium" style={{ color: '#5e6ad2' }}>
-                {totalStats.progressPercent}%
-              </span>
-            </div>
-            <div className="h-2 bg-muted rounded-full overflow-hidden">
-              <div
-                className="h-full transition-all duration-500 rounded-full"
-                style={{
-                  width: `${totalStats.progressPercent}%`,
-                  background: 'linear-gradient(90deg, #5e6ad2 0%, #0f783c 100%)',
-                }}
-              />
-            </div>
-            <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
-              <span>{totalStats.doneTasks}/{totalStats.totalTasks} 완료</span>
-              {totalStats.totalPoints > 0 && (
-                <span>{totalStats.donePoints}/{totalStats.totalPoints} pts</span>
-              )}
-            </div>
-          </div>
-        )}
+      <div className="flex gap-0 overflow-x-auto">
+        {COLUMNS.map(status => {
+          const projectGroups = tasksByStatusAndProject[status];
+          const isDropTarget = dragOverColumn === status;
+          const taskCount = columnStats[status];
 
-        {/* Kanban Board */}
-        <div className="flex gap-4 overflow-x-auto pb-4 scroll-smooth">
-          {COLUMNS.map(status => {
-            const stats = getColumnStats(status);
-            const columnTasks = getTasksByStatus(status);
-            const isDropTarget = dragOverColumn === status;
-
-            return (
-              <div
-                key={status}
-                data-column={status}
-                className="flex-shrink-0 w-80"
-                onDragOver={(e) => handleDragOver(e, status)}
-                onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e, status)}
-              >
-                {/* Column Header - Notion style */}
-                <div className={`flex items-center justify-between mb-3 py-2 px-3 rounded-md bg-muted/30 ${COLUMN_COLORS[status]}`}>
-                  <div className="flex items-center gap-2">
-                    {STATUS_ICONS[status]}
-                    <h3 className="font-medium text-sm text-foreground/90">{STATUS_LABELS[status]}</h3>
-                    <Badge
-                      variant={stats.count > 0 ? (status === 'done' ? 'default' : 'secondary') : 'outline'}
-                      className={`h-5 min-w-5 px-1.5 text-[10px] font-medium rounded-full transition-all ${
-                        stats.count > 0
-                          ? status === 'done'
-                            ? 'bg-green-500/20 text-green-700 dark:text-green-400 border-green-500/30'
-                            : status === 'in_progress'
-                            ? 'bg-blue-500/20 text-blue-700 dark:text-blue-400 border-blue-500/30'
-                            : ''
-                          : ''
-                      }`}
-                    >
-                      {stats.count}
-                    </Badge>
-                  </div>
-                  {stats.points > 0 && (
-                    <Badge variant="outline" className="h-5 text-[10px] font-normal">
-                      {stats.points} pts
-                    </Badge>
+          return (
+            <div
+              key={status}
+              data-column={status}
+              className="flex-1 min-w-[280px] max-w-[380px]"
+              onDragOver={(e) => handleDragOver(e, status)}
+              onDrop={(e) => handleDrop(e, status)}
+            >
+              {/* Column Header - Linear style */}
+              <div className="flex items-center justify-between px-3 py-2.5 sticky top-0 bg-background z-10">
+                <div className="flex items-center gap-2">
+                  {STATUS_ICONS[status]}
+                  <span className="text-[13px] font-medium text-[#e8e8e8]">
+                    {LINEAR_STATUS_LABELS[status]}
+                  </span>
+                  {taskCount > 0 && (
+                    <span className="text-[12px] text-[#8b8b8f] ml-0.5">
+                      {taskCount}
+                    </span>
                   )}
                 </div>
-
-                {/* Column Body */}
-                <div
-                  className={`min-h-[300px] rounded-lg p-2 transition-all duration-200 ${
-                    isDropTarget
-                      ? 'bg-primary/10 ring-2 ring-primary/40 ring-offset-2'
-                      : 'bg-muted/20'
-                  }`}
-                >
-                  <div className="space-y-3">
-                    {columnTasks.map(task => {
-                      const dueInfo = formatDueDate(task.endDate);
-                      const isDragging = draggedTask?.id === task.id;
-                      const isFocused = focusedTaskId === task.id;
-
-                      return (
-                        <Card
-                          key={task.id}
-                          ref={(el) => {
-                            if (el) taskRefs.current.set(task.id, el);
-                            else taskRefs.current.delete(task.id);
-                          }}
-                          className={`
-                            group relative p-3 cursor-pointer transition-all duration-150
-                            bg-card hover:bg-accent/50 border-border/50
-                            hover:border-border hover:shadow-sm
-                            focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none
-                            ${isDragging ? 'opacity-50 scale-[0.98] rotate-1 shadow-lg' : ''}
-                            ${isFocused ? 'ring-2 ring-primary/50 bg-accent/30' : ''}
-                          `}
-                          draggable
-                          tabIndex={0}
-                          role="button"
-                          aria-label={`${task.name}, ${STATUS_LABELS[task.status]}, ${task.progress}% 완료`}
-                          onDragStart={(e) => handleDragStart(e, task)}
-                          onDragEnd={handleDragEnd}
-                          onTouchStart={(e) => handleTouchStart(e, task)}
-                          onTouchMove={handleTouchMove}
-                          onTouchEnd={handleTouchEnd}
-                          onClick={() => onTaskClick(task)}
-                          onKeyDown={(e) => handleKeyDown(e, task)}
-                          onFocus={() => setFocusedTaskId(task.id)}
-                          onBlur={() => setFocusedTaskId(null)}
-                        >
-                          {/* Color indicator - Linear style */}
-                          <div
-                            className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full"
-                            style={{ backgroundColor: task.color }}
-                          />
-
-                          {/* Drag handle (visible on hover) */}
-                          <div className="absolute -left-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-40 hover:!opacity-70 transition-opacity cursor-grab">
-                            <GripVertical className="h-4 w-4 text-muted-foreground" />
-                          </div>
-
-                          {/* Task Header */}
-                          <div className="flex items-start justify-between gap-2 pl-1">
-                            <div className="flex items-start gap-2 flex-1 min-w-0">
-                              {getPriorityIcon(task.priority)}
-                              {task.linearIssueId && (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Link className="h-3.5 w-3.5 text-blue-500 shrink-0 mt-0.5" />
-                                  </TooltipTrigger>
-                                  <TooltipContent>Linear 연동됨</TooltipContent>
-                                </Tooltip>
-                              )}
-                              <span className="font-medium text-sm line-clamp-2 leading-tight">
-                                {task.name}
-                              </span>
-                            </div>
-
-                            <div className="flex items-center gap-0.5">
-                              {/* Quick action: Move to next status */}
-                              {status !== 'done' && (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-6 w-6 p-0 opacity-0 group-hover:opacity-60 hover:!opacity-100 hover:bg-accent transition-all rounded"
-                                      onClick={(e) => moveToNextStatus(task, e)}
-                                    >
-                                      <ChevronRight className="h-3.5 w-3.5" />
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>다음 단계로 이동</TooltipContent>
-                                </Tooltip>
-                              )}
-
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0 opacity-0 group-hover:opacity-60 hover:!opacity-100 hover:bg-accent transition-all rounded">
-                                    <MoreHorizontal className="h-3.5 w-3.5" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-48">
-                                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onTaskClick(task); }}>
-                                    수정
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  {COLUMNS.filter(s => s !== status).map(s => (
-                                    <DropdownMenuItem
-                                      key={s}
-                                      onClick={(e) => { e.stopPropagation(); onStatusChange(task.id, s); }}
-                                    >
-                                      <span className="flex items-center gap-2">
-                                        {STATUS_ICONS[s]}
-                                        {STATUS_LABELS[s]}로 이동
-                                      </span>
-                                    </DropdownMenuItem>
-                                  ))}
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    className="text-destructive focus:text-destructive"
-                                    onClick={(e) => { e.stopPropagation(); onDeleteTask(task.id); }}
-                                  >
-                                    삭제
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
-                          </div>
-
-                          {/* Progress bar for tasks */}
-                          {task.progress > 0 && task.progress < 100 && (
-                            <div className="mt-2 pl-1">
-                              <Progress value={task.progress} className="h-1" />
-                            </div>
-                          )}
-
-                          {/* Task Meta - Notion style inline tags */}
-                          <div className="mt-2 pl-1 flex items-center gap-1.5 flex-wrap">
-                            {task.storyPoints !== undefined && task.storyPoints > 0 && (
-                              <span className="inline-flex items-center text-[10px] px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground font-medium">
-                                {task.storyPoints} pts
-                              </span>
-                            )}
-                            {task.priority !== 'none' && (
-                              <PriorityBadge priority={task.priority} size="sm" />
-                            )}
-                          </div>
-
-                          {/* Task Footer */}
-                          <div className="mt-2 pl-1 flex items-center justify-between text-xs">
-                            <div
-                              className={`flex items-center gap-1 ${
-                                dueInfo.isOverdue
-                                  ? 'text-red-500 font-medium'
-                                  : dueInfo.isSoon
-                                  ? 'text-orange-500'
-                                  : 'text-muted-foreground'
-                              }`}
-                            >
-                              <Clock className="h-3 w-3" />
-                              {dueInfo.text}
-                            </div>
-                            {task.assignee && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <div className="flex items-center gap-1.5 text-muted-foreground">
-                                    {task.assigneeAvatarUrl ? (
-                                      <img
-                                        src={task.assigneeAvatarUrl}
-                                        alt={task.assignee}
-                                        className="w-4 h-4 rounded-full object-cover ring-1 ring-border/50"
-                                      />
-                                    ) : (
-                                      <div className="w-4 h-4 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[8px] font-bold">
-                                        {task.assignee.charAt(0).toUpperCase()}
-                                      </div>
-                                    )}
-                                    <span className="truncate max-w-[80px]">{task.assignee}</span>
-                                  </div>
-                                </TooltipTrigger>
-                                <TooltipContent>{task.assignee}</TooltipContent>
-                              </Tooltip>
-                            )}
-                          </div>
-
-                          {/* Labels - Notion style */}
-                          {task.labels && task.labels.length > 0 && (
-                            <div className="mt-2 pl-1 flex flex-wrap gap-1">
-                              {task.labels.slice(0, 2).map((label, i) => (
-                                <span key={i} className="inline-flex items-center text-[11px] px-1.5 py-0.5 rounded bg-accent text-accent-foreground">
-                                  {label}
-                                </span>
-                              ))}
-                              {task.labels.length > 2 && (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <span className="inline-flex items-center text-[11px] px-1.5 py-0.5 rounded bg-accent text-muted-foreground cursor-help">
-                                      +{task.labels.length - 2}
-                                    </span>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    {task.labels.slice(2).join(', ')}
-                                  </TooltipContent>
-                                </Tooltip>
-                              )}
-                            </div>
-                          )}
-                        </Card>
-                      );
-                    })}
-
-                    {columnTasks.length === 0 && (
-                      <div className={`text-center text-sm py-8 rounded-lg transition-all ${
-                        isDropTarget
-                          ? 'bg-primary/10 border-2 border-dashed border-primary/40 text-primary font-medium'
-                          : 'text-muted-foreground/60'
-                      }`}>
-                        {isDropTarget ? '여기에 놓으세요' : '태스크 없음'}
-                      </div>
-                    )}
-                  </div>
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-[#8b8b8f] hover:text-[#e8e8e8] hover:bg-[#2d2e32]">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-[#8b8b8f] hover:text-[#e8e8e8] hover:bg-[#2d2e32]">
+                    <Plus className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
-            );
-          })}
-        </div>
 
-        {/* Keyboard shortcut hint - Notion style */}
-        {tasks.length > 0 && (
-          <div className="text-[11px] text-muted-foreground/70 text-center pt-3">
-            <span className="hidden md:inline">
-              태스크 선택 후 <kbd className="px-1 py-0.5 bg-muted/50 rounded text-[10px] font-mono">←</kbd>{' '}
-              <kbd className="px-1 py-0.5 bg-muted/50 rounded text-[10px] font-mono">→</kbd> 키로 상태 변경
-            </span>
-          </div>
-        )}
+              {/* Column Body */}
+              <div
+                className={`
+                  min-h-[400px] px-2 py-1 transition-colors duration-150
+                  ${isDropTarget ? 'bg-[#5e6ad2]/10' : ''}
+                `}
+              >
+                {/* Render tasks grouped by project */}
+                {Array.from(projectGroups.entries()).map(([projectId, projectTasks]) => {
+                  if (projectId === '__no_project__') {
+                    // Tasks without project - render directly
+                    return (
+                      <div key={projectId} className="space-y-2 mb-3">
+                        {projectTasks.map(task => renderTaskCard(task, status))}
+                      </div>
+                    );
+                  }
+
+                  // Project group
+                  const isCollapsed = collapsedProjects.has(projectId);
+                  const projectName = getProjectName(projectId);
+                  const projectColor = projectInfo[projectId]?.color || '#5e6ad2';
+
+                  return (
+                    <div key={projectId} className="mb-3">
+                      {/* Project header */}
+                      <button
+                        onClick={() => toggleProjectCollapse(projectId)}
+                        className="flex items-center gap-2 w-full px-2 py-1.5 hover:bg-[#26272b] rounded transition-colors"
+                      >
+                        {isCollapsed ? (
+                          <ChevronRight className="h-3.5 w-3.5 text-[#8b8b8f]" />
+                        ) : (
+                          <ChevronDown className="h-3.5 w-3.5 text-[#8b8b8f]" />
+                        )}
+                        <div
+                          className="w-4 h-4 rounded flex items-center justify-center"
+                          style={{ backgroundColor: projectColor }}
+                        >
+                          <span className="text-white text-[10px]">●</span>
+                        </div>
+                        <span className="text-[12px] text-[#e8e8e8] truncate flex-1 text-left">
+                          {projectName}
+                        </span>
+                        <span className="text-[11px] text-[#8b8b8f]">
+                          {projectTasks.length}
+                        </span>
+                      </button>
+
+                      {/* Project tasks */}
+                      {!isCollapsed && (
+                        <div className="space-y-2 mt-1 ml-5">
+                          {projectTasks.map(task => renderTaskCard(task, status))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Empty state */}
+                {projectGroups.size === 0 && (
+                  <div className={`
+                    text-center py-12 text-[13px] text-[#5c5c5f]
+                    ${isDropTarget ? 'bg-[#5e6ad2]/5 border border-dashed border-[#5e6ad2]/30 rounded-lg' : ''}
+                  `}>
+                    {isDropTarget ? '여기에 놓기' : ''}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </TooltipProvider>
   );

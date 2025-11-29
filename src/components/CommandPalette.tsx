@@ -15,26 +15,24 @@ import {
   Plus,
   Layers,
   GanttChartSquare,
-  Settings,
   Moon,
   Sun,
   Keyboard,
   FileDown,
   FileUp,
   RefreshCw,
-  Filter,
   CheckCircle2,
   Circle,
   Timer,
   AlertCircle,
-  Calendar,
   Users,
-  Tag,
   Hash,
-  ArrowRight,
   Zap,
+  ArrowRight,
+  LayoutDashboard,
 } from 'lucide-react';
 import { SprintTask } from '../types/sprint';
+import { cn } from './ui/utils';
 
 interface CommandPaletteProps {
   open: boolean;
@@ -65,11 +63,11 @@ interface CommandOption {
 }
 
 const STATUS_ICONS: Record<string, React.ReactNode> = {
-  backlog: <Circle className="h-4 w-4 text-gray-400" />,
-  todo: <Circle className="h-4 w-4 text-gray-500" strokeWidth={2.5} />,
-  in_progress: <Timer className="h-4 w-4 text-[#5e6ad2]" />,
-  in_review: <AlertCircle className="h-4 w-4 text-[#f2994a]" />,
-  done: <CheckCircle2 className="h-4 w-4 text-[#0f783c]" />,
+  backlog: <Circle className="h-[14px] w-[14px] text-[#95959f]" strokeWidth={1.5} />,
+  todo: <Circle className="h-[14px] w-[14px] text-[#e2e2e3]" strokeWidth={2} />,
+  in_progress: <Timer className="h-[14px] w-[14px] text-[#f2c94c]" />,
+  in_review: <AlertCircle className="h-[14px] w-[14px] text-[#bb87fc]" />,
+  done: <CheckCircle2 className="h-[14px] w-[14px] text-[#4da568]" />,
 };
 
 export function CommandPalette({
@@ -88,14 +86,12 @@ export function CommandPalette({
 }: CommandPaletteProps) {
   const [search, setSearch] = useState('');
 
-  // Reset search when dialog closes
   useEffect(() => {
     if (!open) {
       setSearch('');
     }
   }, [open]);
 
-  // Global keyboard shortcut to open command palette
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -117,8 +113,8 @@ export function CommandPalette({
     {
       id: 'create-task',
       type: 'action',
-      label: '새 태스크 생성',
-      description: '새로운 태스크를 만듭니다',
+      label: '새 이슈 생성',
+      description: '새로운 이슈를 만듭니다',
       icon: <Plus className="h-4 w-4" />,
       shortcut: 'C',
       action: () => handleSelect(onCreateTask),
@@ -199,7 +195,6 @@ export function CommandPalette({
     },
   ], [currentTheme, handleSelect, onToggleTheme, onShowShortcuts, onExport, onImport]);
 
-  // Filter tasks based on search
   const filteredTasks = useMemo(() => {
     if (!search || search.length < 2) return tasks.slice(0, 5);
     const lowerSearch = search.toLowerCase();
@@ -207,174 +202,189 @@ export function CommandPalette({
       task.name.toLowerCase().includes(lowerSearch) ||
       task.description?.toLowerCase().includes(lowerSearch) ||
       task.assignee?.toLowerCase().includes(lowerSearch) ||
-      task.labels?.some(label => label.toLowerCase().includes(lowerSearch))
+      task.labels?.some(label => {
+        if (typeof label === 'string') return label.toLowerCase().includes(lowerSearch);
+        return label.name?.toLowerCase().includes(lowerSearch);
+      })
     ).slice(0, 10);
   }, [search, tasks]);
 
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange}>
-      <Command className="rounded-lg border shadow-md" loop>
-        <div className="flex items-center border-b px-3 gap-2">
-          <Search className="h-4 w-4 shrink-0 opacity-50" />
+      <Command className="rounded-lg bg-[#1f2023] border-[#333438]" loop>
+        <div className="flex items-center border-b border-[#333438] px-4 gap-3">
+          <Search className="h-4 w-4 shrink-0 text-[#6b6b6f]" />
           <CommandInput
             placeholder="검색하거나 명령을 입력하세요..."
             value={search}
             onValueChange={setSearch}
-            className="flex h-12 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 border-0"
+            className="flex h-12 w-full bg-transparent py-3 text-[14px] text-[#e2e2e3] outline-none placeholder:text-[#6b6b6f] border-0"
           />
-          <kbd className="pointer-events-none hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex">
+          <kbd className="hidden sm:flex h-5 items-center gap-1 rounded border border-[#333438] bg-[#26272b] px-1.5 font-mono text-[10px] text-[#6b6b6f]">
             ESC
           </kbd>
         </div>
-        <CommandList className="max-h-[400px] overflow-y-auto">
-          <CommandEmpty className="py-6 text-center text-sm text-muted-foreground">
+        <CommandList className="max-h-[400px] overflow-y-auto p-2">
+          <CommandEmpty className="py-8 text-center">
             <div className="flex flex-col items-center gap-2">
-              <Search className="h-8 w-8 opacity-30" />
-              <span>검색 결과가 없습니다</span>
+              <Search className="h-8 w-8 text-[#4b4b4f]" />
+              <span className="text-[13px] text-[#6b6b6f]">검색 결과가 없습니다</span>
             </div>
           </CommandEmpty>
 
           {/* Quick Actions */}
-          <CommandGroup heading="빠른 작업">
+          <CommandGroup heading={<span className="text-[11px] font-medium text-[#6b6b6f] uppercase tracking-wider">빠른 작업</span>}>
             {quickActions.map((cmd) => (
               <CommandItem
                 key={cmd.id}
                 value={`${cmd.label} ${cmd.keywords?.join(' ')}`}
                 onSelect={cmd.action}
-                className="flex items-center gap-3 px-3 py-2.5 cursor-pointer"
+                className="flex items-center gap-3 px-3 py-2.5 rounded-md cursor-pointer data-[selected=true]:bg-[#333438]"
               >
-                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary">
+                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-[#5e6ad2]/20 text-[#5e6ad2]">
                   {cmd.icon}
                 </div>
                 <div className="flex flex-col flex-1">
-                  <span className="font-medium">{cmd.label}</span>
+                  <span className="text-[13px] font-medium text-[#e2e2e3]">{cmd.label}</span>
                   {cmd.description && (
-                    <span className="text-xs text-muted-foreground">{cmd.description}</span>
+                    <span className="text-[11px] text-[#6b6b6f]">{cmd.description}</span>
                   )}
                 </div>
                 {cmd.shortcut && (
-                  <CommandShortcut>{cmd.shortcut}</CommandShortcut>
+                  <kbd className="px-1.5 py-0.5 rounded border border-[#333438] bg-[#26272b] text-[10px] font-mono text-[#6b6b6f]">
+                    {cmd.shortcut}
+                  </kbd>
                 )}
               </CommandItem>
             ))}
           </CommandGroup>
 
-          <CommandSeparator />
+          <div className="h-px bg-[#333438] my-2" />
 
           {/* Navigation */}
-          <CommandGroup heading="이동">
+          <CommandGroup heading={<span className="text-[11px] font-medium text-[#6b6b6f] uppercase tracking-wider">이동</span>}>
             {navigationCommands.map((cmd) => (
               <CommandItem
                 key={cmd.id}
                 value={`${cmd.label} ${cmd.keywords?.join(' ')}`}
                 onSelect={cmd.action}
-                className="flex items-center gap-3 px-3 py-2.5 cursor-pointer"
+                className="flex items-center gap-3 px-3 py-2.5 rounded-md cursor-pointer data-[selected=true]:bg-[#333438]"
               >
-                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent">
+                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-[#333438] text-[#8b8b8f]">
                   {cmd.icon}
                 </div>
                 <div className="flex flex-col flex-1">
-                  <span className="font-medium">{cmd.label}</span>
+                  <span className="text-[13px] font-medium text-[#e2e2e3]">{cmd.label}</span>
                   {cmd.description && (
-                    <span className="text-xs text-muted-foreground">{cmd.description}</span>
+                    <span className="text-[11px] text-[#6b6b6f]">{cmd.description}</span>
                   )}
                 </div>
                 {cmd.shortcut && (
-                  <CommandShortcut>{cmd.shortcut}</CommandShortcut>
+                  <kbd className="px-1.5 py-0.5 rounded border border-[#333438] bg-[#26272b] text-[10px] font-mono text-[#6b6b6f]">
+                    {cmd.shortcut}
+                  </kbd>
                 )}
               </CommandItem>
             ))}
           </CommandGroup>
 
-          <CommandSeparator />
-
           {/* Tasks */}
           {filteredTasks.length > 0 && (
             <>
-              <CommandGroup heading="태스크">
-                {filteredTasks.map((task) => (
-                  <CommandItem
-                    key={task.id}
-                    value={`${task.name} ${task.assignee || ''} ${task.labels?.join(' ') || ''}`}
-                    onSelect={() => handleSelect(() => onSelectTask(task))}
-                    className="flex items-center gap-3 px-3 py-2.5 cursor-pointer"
-                  >
-                    <div className="flex h-8 w-8 items-center justify-center">
-                      {STATUS_ICONS[task.status]}
-                    </div>
-                    <div className="flex flex-col flex-1 min-w-0">
-                      <span className="font-medium truncate">{task.name}</span>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        {task.assignee && (
-                          <span className="flex items-center gap-1">
-                            <Users className="h-3 w-3" />
-                            {task.assignee}
-                          </span>
-                        )}
-                        {task.storyPoints !== undefined && task.storyPoints > 0 && (
-                          <span className="flex items-center gap-1">
-                            <Hash className="h-3 w-3" />
-                            {task.storyPoints}pts
-                          </span>
-                        )}
+              <div className="h-px bg-[#333438] my-2" />
+              <CommandGroup heading={<span className="text-[11px] font-medium text-[#6b6b6f] uppercase tracking-wider">이슈</span>}>
+                {filteredTasks.map((task) => {
+                  const issueId = task.linearIssueId
+                    ? `COV-${task.linearIssueId.split('-').pop()?.slice(-3) || '???'}`
+                    : `#${task.id.slice(0, 4)}`;
+
+                  return (
+                    <CommandItem
+                      key={task.id}
+                      value={`${task.name} ${task.assignee || ''} ${task.labels?.map(l => typeof l === 'string' ? l : l.name).join(' ') || ''}`}
+                      onSelect={() => handleSelect(() => onSelectTask(task))}
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-md cursor-pointer data-[selected=true]:bg-[#333438]"
+                    >
+                      <div className="flex h-8 w-8 items-center justify-center">
+                        {STATUS_ICONS[task.status]}
                       </div>
-                    </div>
-                    <div
-                      className="w-2 h-2 rounded-full"
-                      style={{ backgroundColor: task.color }}
-                    />
-                  </CommandItem>
-                ))}
+                      <div className="flex flex-col flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-[#6b6b6f] font-mono">{issueId}</span>
+                          <span className="text-[13px] font-medium text-[#e2e2e3] truncate">{task.name}</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-[11px] text-[#6b6b6f]">
+                          {task.assignee && (
+                            <span className="flex items-center gap-1">
+                              <Users className="h-3 w-3" />
+                              {task.assignee}
+                            </span>
+                          )}
+                          {task.storyPoints !== undefined && task.storyPoints > 0 && (
+                            <span className="flex items-center gap-1">
+                              <Hash className="h-3 w-3" />
+                              {task.storyPoints}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <ArrowRight className="h-4 w-4 text-[#4b4b4f]" />
+                    </CommandItem>
+                  );
+                })}
               </CommandGroup>
-              <CommandSeparator />
             </>
           )}
 
+          <div className="h-px bg-[#333438] my-2" />
+
           {/* Settings */}
-          <CommandGroup heading="설정">
+          <CommandGroup heading={<span className="text-[11px] font-medium text-[#6b6b6f] uppercase tracking-wider">설정</span>}>
             {settingsCommands.map((cmd) => (
               <CommandItem
                 key={cmd.id}
                 value={`${cmd.label} ${cmd.keywords?.join(' ')}`}
                 onSelect={cmd.action}
-                className="flex items-center gap-3 px-3 py-2.5 cursor-pointer"
+                className="flex items-center gap-3 px-3 py-2.5 rounded-md cursor-pointer data-[selected=true]:bg-[#333438]"
               >
-                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-muted">
+                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-[#26272b] text-[#8b8b8f]">
                   {cmd.icon}
                 </div>
                 <div className="flex flex-col flex-1">
-                  <span className="font-medium">{cmd.label}</span>
+                  <span className="text-[13px] font-medium text-[#e2e2e3]">{cmd.label}</span>
                   {cmd.description && (
-                    <span className="text-xs text-muted-foreground">{cmd.description}</span>
+                    <span className="text-[11px] text-[#6b6b6f]">{cmd.description}</span>
                   )}
                 </div>
                 {cmd.shortcut && (
-                  <CommandShortcut>{cmd.shortcut}</CommandShortcut>
+                  <kbd className="px-1.5 py-0.5 rounded border border-[#333438] bg-[#26272b] text-[10px] font-mono text-[#6b6b6f]">
+                    {cmd.shortcut}
+                  </kbd>
                 )}
               </CommandItem>
             ))}
           </CommandGroup>
         </CommandList>
 
-        {/* Footer hint */}
-        <div className="flex items-center justify-between border-t px-3 py-2 text-xs text-muted-foreground">
-          <div className="flex items-center gap-4">
-            <span className="flex items-center gap-1">
-              <kbd className="px-1 py-0.5 rounded bg-muted">↑↓</kbd>
+        {/* Footer */}
+        <div className="flex items-center justify-between border-t border-[#333438] px-4 py-2.5">
+          <div className="flex items-center gap-4 text-[11px] text-[#6b6b6f]">
+            <span className="flex items-center gap-1.5">
+              <kbd className="px-1 py-0.5 rounded bg-[#26272b] border border-[#333438]">↑↓</kbd>
               이동
             </span>
-            <span className="flex items-center gap-1">
-              <kbd className="px-1 py-0.5 rounded bg-muted">↵</kbd>
+            <span className="flex items-center gap-1.5">
+              <kbd className="px-1 py-0.5 rounded bg-[#26272b] border border-[#333438]">↵</kbd>
               선택
             </span>
-            <span className="flex items-center gap-1">
-              <kbd className="px-1 py-0.5 rounded bg-muted">esc</kbd>
+            <span className="flex items-center gap-1.5">
+              <kbd className="px-1 py-0.5 rounded bg-[#26272b] border border-[#333438]">esc</kbd>
               닫기
             </span>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5 text-[11px] text-[#5e6ad2]">
             <Zap className="h-3 w-3" />
-            <span>Linear Style</span>
+            <span className="font-medium">Powered by Linear</span>
           </div>
         </div>
       </Command>

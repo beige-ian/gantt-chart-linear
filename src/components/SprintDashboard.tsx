@@ -31,6 +31,7 @@ import {
   deleteLinearIssue,
   fetchLinearTeams,
   formatDateForLinear,
+  fetchLinearBacklogIssues,
 } from '../services/linear';
 
 type ViewMode = 'board' | 'gantt' | 'analytics';
@@ -40,6 +41,8 @@ export function SprintDashboard() {
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [currentSprintId, setCurrentSprintId] = useState<string | undefined>();
   const [sprintTasks, setSprintTasks] = useState<SprintTask[]>([]);
+  const [backlogTasks, setBacklogTasks] = useState<SprintTask[]>([]);
+  const [isLoadingBacklog, setIsLoadingBacklog] = useState(false);
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<SprintTask | null>(null);
   const { members: teamMembers, updateMembers: setTeamMembers } = useTeamMembers();
@@ -109,6 +112,70 @@ export function SprintDashboard() {
       localStorage.setItem('sprint-tasks', JSON.stringify(sprintTasks));
     }
   }, [sprintTasks]);
+
+  // Fetch backlog issues from Linear (issues without a cycle)
+  useEffect(() => {
+    const fetchBacklog = async () => {
+      const apiKey = localStorage.getItem('linear-api-key');
+      const teamId = localStorage.getItem('linear-selected-team-id');
+
+      if (!apiKey || !teamId) return;
+
+      setIsLoadingBacklog(true);
+      try {
+        const issues = await fetchLinearBacklogIssues(apiKey, teamId);
+
+        // Convert Linear priority to our priority format
+        const linearPriorityMap: Record<number, SprintTask['priority']> = {
+          0: 'none',
+          1: 'urgent',
+          2: 'high',
+          3: 'medium',
+          4: 'low',
+        };
+
+        // Convert issues to SprintTask format
+        const tasks: SprintTask[] = issues.map((issue: any) => ({
+          id: issue.id,
+          name: issue.title,
+          description: issue.description || '',
+          startDate: issue.startedAt ? new Date(issue.startedAt) : new Date(),
+          endDate: issue.dueDate ? new Date(issue.dueDate) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          status: 'backlog' as const,
+          priority: linearPriorityMap[issue.priority] || 'none',
+          assignee: issue.assignee?.displayName || issue.assignee?.name,
+          assigneeId: issue.assignee?.id,
+          assigneeAvatarUrl: issue.assignee?.avatarUrl,
+          storyPoints: issue.estimate,
+          progress: 0,
+          color: '#6366f1',
+          linearIssueId: issue.id,
+          labels: issue.labels?.nodes?.map((l: any) => ({
+            id: l.id,
+            name: l.name,
+            color: l.color,
+          })) || [],
+          teamId: issue.team?.id,
+          teamName: issue.team?.name,
+          teamIcon: issue.team?.icon,
+          // No sprintId - these are backlog items
+        }));
+
+        setBacklogTasks(tasks);
+      } catch (error) {
+        console.error('Failed to fetch backlog issues:', error);
+      } finally {
+        setIsLoadingBacklog(false);
+      }
+    };
+
+    fetchBacklog();
+
+    // Refetch when Linear sync happens
+    const handleLinearSync = () => fetchBacklog();
+    window.addEventListener('linear-sync-complete', handleLinearSync);
+    return () => window.removeEventListener('linear-sync-complete', handleLinearSync);
+  }, []);
 
   // Sprint handlers
   const handleCreateSprint = (sprintData: Omit<Sprint, 'id'>) => {
@@ -360,14 +427,41 @@ export function SprintDashboard() {
   };
 
   // Assign task to sprint
-  const handleTaskAssignToSprint = async (taskId: string, sprintId: string) => {
-    const task = sprintTasks.find(t => t.id === taskId);
-    if (!task) return;
+  const handleTaskAssignToSprint = async (taskId: string, sprintId: string, newStatus?: SprintTask['status']) => {
+    // First check in sprintTasks
+    let task = sprintTasks.find(t => t.id === taskId);
+    let isFromBacklog = false;
 
-    // Update local state
-    setSprintTasks(sprintTasks.map(t =>
-      t.id === taskId ? { ...t, sprintId } : t
-    ));
+    // If not found, check in backlogTasks
+    if (!task) {
+      task = backlogTasks.find(t => t.id === taskId);
+      isFromBacklog = true;
+    }
+
+    if (!task) {
+      console.error('Task not found:', taskId);
+      return;
+    }
+
+    // Determine the status to use
+    const statusToUse = newStatus || task.status;
+
+    if (isFromBacklog) {
+      // Add backlog task to sprint tasks
+      const newTask: SprintTask = {
+        ...task,
+        sprintId,
+        status: statusToUse,
+      };
+      setSprintTasks(prev => [...prev, newTask]);
+      // Remove from backlog
+      setBacklogTasks(prev => prev.filter(t => t.id !== taskId));
+    } else {
+      // Update existing sprint task
+      setSprintTasks(sprintTasks.map(t =>
+        t.id === taskId ? { ...t, sprintId, status: statusToUse } : t
+      ));
+    }
 
     // Find the sprint's linkedCycleId to update Linear
     const sprint = sprints.find(s => s.id === sprintId);
@@ -382,10 +476,52 @@ export function SprintDashboard() {
           toast.success('Linear 동기화 완료', { description: '스프린트에 추가됨' });
         } catch (error) {
           console.error('Failed to sync with Linear:', error);
+          toast.success('스프린트에 추가됨', { description: task.name });
         }
+      } else {
+        toast.success('스프린트에 추가됨', { description: task.name });
       }
     } else {
       toast.success('스프린트에 추가됨', { description: task.name });
+    }
+  };
+
+  // Unassign task from sprint (move to backlog)
+  const handleUnassignFromSprint = async (taskId: string) => {
+    const task = sprintTasks.find(t => t.id === taskId);
+    if (!task) {
+      console.error('Task not found:', taskId);
+      return;
+    }
+
+    // Move to backlog
+    const backlogTask: SprintTask = {
+      ...task,
+      sprintId: undefined,
+      status: 'backlog',
+    };
+    setBacklogTasks(prev => [...prev, backlogTask]);
+    setSprintTasks(prev => prev.filter(t => t.id !== taskId));
+
+    // Remove from Linear cycle
+    if (task.linearIssueId) {
+      const apiKey = localStorage.getItem('linear-api-key');
+      if (apiKey) {
+        try {
+          const { updateLinearIssueExtended } = await import('../services/linear');
+          await updateLinearIssueExtended(apiKey, task.linearIssueId, {
+            cycleId: null,
+          });
+          toast.success('백로그로 이동됨', { description: task.name });
+        } catch (error) {
+          console.error('Failed to sync with Linear:', error);
+          toast.success('백로그로 이동됨', { description: task.name });
+        }
+      } else {
+        toast.success('백로그로 이동됨', { description: task.name });
+      }
+    } else {
+      toast.success('백로그로 이동됨', { description: task.name });
     }
   };
 
@@ -614,7 +750,7 @@ export function SprintDashboard() {
           </div>
         </div>
 
-        <TabsContent value="board" className="mt-4 space-y-4">
+        <TabsContent value="board" className="mt-6 space-y-8">
           {/* Task Filters */}
           <TaskFilters
             filters={taskFilters}
@@ -624,23 +760,27 @@ export function SprintDashboard() {
             assignees={uniqueAssignees}
           />
 
-          {/* Backlog Panel - Show unassigned tasks */}
-          {currentSprintId && (
-            <BacklogPanel
-              tasks={sprintTasks}
-              onTaskClick={handleTaskClick}
-              onTaskAssignToSprint={handleTaskAssignToSprint}
-              currentSprintId={currentSprintId}
-            />
-          )}
-
+          {/* Sprint Board - Current sprint tasks (Kanban) */}
           <SprintBoard
             tasks={filteredTasks}
             onTaskClick={handleTaskClick}
             onStatusChange={handleStatusChange}
             onDeleteTask={handleDeleteTask}
-            onTaskDropFromBacklog={currentSprintId ? (taskId) => handleTaskAssignToSprint(taskId, currentSprintId) : undefined}
+            onTaskDropFromBacklog={currentSprintId ? (taskId, status) => handleTaskAssignToSprint(taskId, currentSprintId, status) : undefined}
+            onUnassignFromSprint={handleUnassignFromSprint}
           />
+
+          {/* Backlog Panel - Unassigned tasks from Linear */}
+          {currentSprintId && (
+            <div className="pt-4">
+              <BacklogPanel
+                tasks={backlogTasks}
+                onTaskClick={handleTaskClick}
+                onTaskAssignToSprint={(taskId, sprintId) => handleTaskAssignToSprint(taskId, sprintId)}
+                currentSprintId={currentSprintId}
+              />
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="gantt" className="mt-4">

@@ -24,17 +24,21 @@ export function EmptyState({
   return (
     <div className={cn(
       'flex flex-col items-center justify-center py-12 px-4 text-center',
+      'animate-in fade-in-0 slide-in-from-bottom-4 duration-500',
       className
     )}>
-      <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4">
+      <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4 animate-in zoom-in-50 duration-300 delay-100">
         <Icon className="h-6 w-6 text-muted-foreground" />
       </div>
-      <h3 className="text-lg font-medium text-foreground mb-1">{title}</h3>
+      <h3 className="text-lg font-medium text-foreground mb-1 animate-in fade-in-0 slide-in-from-bottom-2 duration-300 delay-150">{title}</h3>
       {description && (
-        <p className="text-sm text-muted-foreground max-w-sm mb-4">{description}</p>
+        <p className="text-sm text-muted-foreground max-w-sm mb-4 animate-in fade-in-0 slide-in-from-bottom-2 duration-300 delay-200">{description}</p>
       )}
       {action && (
-        <Button onClick={action.onClick} className="gap-2">
+        <Button
+          onClick={action.onClick}
+          className="gap-2 animate-in fade-in-0 zoom-in-95 duration-300 delay-300 hover:scale-105 active:scale-95 transition-transform"
+        >
           <Plus className="h-4 w-4" />
           {action.label}
         </Button>

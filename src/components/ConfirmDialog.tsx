@@ -62,10 +62,10 @@ export function ConfirmDialog({
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
+      <AlertDialogContent className="animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2 duration-200">
         <AlertDialogHeader>
           <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-full ${
+            <div className={`p-2 rounded-full transition-all duration-200 ${
               variant === 'danger' ? 'bg-red-100 dark:bg-red-900/30' :
               variant === 'warning' ? 'bg-yellow-100 dark:bg-yellow-900/30' :
               'bg-blue-100 dark:bg-blue-900/30'
@@ -79,10 +79,15 @@ export function ConfirmDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={isLoading}>{cancelText}</AlertDialogCancel>
+          <AlertDialogCancel
+            disabled={isLoading}
+            className="transition-all duration-150 hover:scale-[1.02] active:scale-[0.98]"
+          >
+            {cancelText}
+          </AlertDialogCancel>
           <AlertDialogAction
             onClick={handleConfirm}
-            className={getButtonClass()}
+            className={`transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] ${getButtonClass()}`}
             disabled={isLoading}
           >
             {isLoading ? '처리 중...' : confirmText}

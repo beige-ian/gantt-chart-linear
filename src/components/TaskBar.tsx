@@ -334,9 +334,9 @@ export function TaskBar({
 
   const taskBarElement = (
     <div
-      className={`absolute ${barHeight} ${barRadius} task-bar group/bar ${
+      className={`absolute ${barHeight} ${barRadius} task-bar group/bar transition-all duration-200 ease-out ${
         isSubtask ? 'opacity-90' : ''
-      } ${isActive ? 'z-30' : ''} ${onDateChange ? 'cursor-grab active:cursor-grabbing' : ''}`}
+      } ${isActive ? 'z-30 scale-[1.02]' : 'hover:scale-[1.01]'} ${onDateChange ? 'cursor-grab active:cursor-grabbing' : ''}`}
       style={getBarStyle()}
       role="slider"
       aria-label={`${task.name} progress control`}

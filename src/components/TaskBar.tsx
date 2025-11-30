@@ -87,10 +87,29 @@ export function TaskBar({
   // Handle drag start for moving the entire bar
   const handleDragStart = (e: React.MouseEvent | React.TouchEvent) => {
     if (isResizingLeft || isResizingRight) return;
+
+    // Check if click is near the edges - if so, trigger resize instead
+    const target = e.currentTarget as HTMLElement;
+    const rect = target.getBoundingClientRect();
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const relativeX = clientX - rect.left;
+    const edgeThreshold = 16; // pixels from edge to trigger resize
+
+    // If clicking near left edge, trigger left resize
+    if (relativeX <= edgeThreshold && !task.isMilestone) {
+      handleResizeLeftStart(e);
+      return;
+    }
+
+    // If clicking near right edge, trigger right resize
+    if (relativeX >= rect.width - edgeThreshold && !task.isMilestone) {
+      handleResizeRightStart(e);
+      return;
+    }
+
     e.preventDefault();
     setIsDragging(true);
 
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     dragStartX.current = clientX;
     originalStartDate.current = new Date(task.startDate);
     originalEndDate.current = new Date(task.endDate);

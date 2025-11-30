@@ -213,9 +213,9 @@ export function LinearStyleFilters({
   };
 
   return (
-    <div className={cn('space-y-2', className)}>
+    <div className={cn('space-y-1.5', className)}>
       {/* Filter Bar */}
-      <div className="flex items-center gap-1.5 flex-wrap">
+      <div className="flex items-center gap-1 flex-wrap">
         {/* Search */}
         <Popover open={searchOpen} onOpenChange={setSearchOpen}>
           <PopoverTrigger asChild>
@@ -438,7 +438,7 @@ export function LinearStyleFilters({
         </DropdownMenu>
 
         {/* Divider */}
-        <div className="h-4 w-px bg-border mx-1" />
+        <div className="h-3.5 w-px bg-border/50 mx-1" />
 
         {/* Sort */}
         <DropdownMenu>
@@ -482,7 +482,7 @@ export function LinearStyleFilters({
         {/* Clear All */}
         {activeFilterCount > 0 && (
           <>
-            <div className="h-4 w-px bg-border mx-1" />
+            <div className="h-3.5 w-px bg-border/50 mx-1" />
             <Button
               variant="ghost"
               size="sm"
@@ -498,74 +498,74 @@ export function LinearStyleFilters({
 
       {/* Active Filter Chips */}
       {activeFilterCount > 0 && (
-        <div className="flex items-center gap-1.5 flex-wrap">
+        <div className="flex items-center gap-1 flex-wrap">
           {filters.search && (
             <Badge
               variant="secondary"
-              className="h-6 gap-1 pl-2 pr-1 text-xs font-normal cursor-pointer hover:bg-accent"
+              className="h-5 gap-0.5 pl-1.5 pr-0.5 text-[11px] font-normal cursor-pointer hover:bg-accent/80"
               onClick={() => removeFilter('search')}
             >
-              <Search className="h-3 w-3" />
+              <Search className="h-2.5 w-2.5" />
               "{filters.search}"
-              <X className="h-3 w-3 ml-0.5" />
+              <X className="h-2.5 w-2.5" />
             </Badge>
           )}
           {filters.status.map((status) => (
             <Badge
               key={status}
               variant="secondary"
-              className="h-6 gap-1 pl-2 pr-1 text-xs font-normal cursor-pointer hover:bg-accent"
+              className="h-5 gap-0.5 pl-1.5 pr-0.5 text-[11px] font-normal cursor-pointer hover:bg-accent/80"
               onClick={() => removeFilter('status', status)}
             >
               {STATUS_ICONS[status]}
               {STATUS_LABELS[status]}
-              <X className="h-3 w-3 ml-0.5" />
+              <X className="h-2.5 w-2.5" />
             </Badge>
           ))}
           {filters.priority.map((priority) => (
             <Badge
               key={priority}
               variant="secondary"
-              className="h-6 gap-1 pl-2 pr-1 text-xs font-normal cursor-pointer hover:bg-accent"
+              className="h-5 gap-0.5 pl-1.5 pr-0.5 text-[11px] font-normal cursor-pointer hover:bg-accent/80"
               onClick={() => removeFilter('priority', priority)}
             >
               {PRIORITY_ICONS[priority]}
               {PRIORITY_LABELS[priority]}
-              <X className="h-3 w-3 ml-0.5" />
+              <X className="h-2.5 w-2.5" />
             </Badge>
           ))}
           {filters.assignee.map((assignee) => (
             <Badge
               key={assignee}
               variant="secondary"
-              className="h-6 gap-1 pl-2 pr-1 text-xs font-normal cursor-pointer hover:bg-accent"
+              className="h-5 gap-0.5 pl-1.5 pr-0.5 text-[11px] font-normal cursor-pointer hover:bg-accent/80"
               onClick={() => removeFilter('assignee', assignee)}
             >
-              <User className="h-3 w-3" />
+              <User className="h-2.5 w-2.5" />
               {assignee}
-              <X className="h-3 w-3 ml-0.5" />
+              <X className="h-2.5 w-2.5" />
             </Badge>
           ))}
           {filters.hasDeadlineSoon && (
             <Badge
               variant="secondary"
-              className="h-6 gap-1 pl-2 pr-1 text-xs font-normal cursor-pointer hover:bg-accent bg-yellow-500/10 text-yellow-600 border-yellow-500/20"
+              className="h-5 gap-0.5 pl-1.5 pr-0.5 text-[11px] font-normal cursor-pointer hover:bg-yellow-500/20 bg-yellow-500/10 text-yellow-600 border-yellow-500/20"
               onClick={() => removeFilter('deadline')}
             >
-              <AlertCircle className="h-3 w-3" />
+              <AlertCircle className="h-2.5 w-2.5" />
               마감 임박
-              <X className="h-3 w-3 ml-0.5" />
+              <X className="h-2.5 w-2.5" />
             </Badge>
           )}
           {filters.isOverdue && (
             <Badge
               variant="secondary"
-              className="h-6 gap-1 pl-2 pr-1 text-xs font-normal cursor-pointer hover:bg-accent bg-red-500/10 text-red-600 border-red-500/20"
+              className="h-5 gap-0.5 pl-1.5 pr-0.5 text-[11px] font-normal cursor-pointer hover:bg-red-500/20 bg-red-500/10 text-red-600 border-red-500/20"
               onClick={() => removeFilter('overdue')}
             >
-              <AlertCircle className="h-3 w-3" />
+              <AlertCircle className="h-2.5 w-2.5" />
               지연됨
-              <X className="h-3 w-3 ml-0.5" />
+              <X className="h-2.5 w-2.5" />
             </Badge>
           )}
         </div>

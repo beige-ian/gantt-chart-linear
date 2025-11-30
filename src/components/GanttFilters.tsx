@@ -120,9 +120,9 @@ export function GanttFilters({
   };
 
   return (
-    <div className={cn('space-y-2', className)}>
+    <div className={cn('space-y-1.5', className)}>
       {/* Filter Bar */}
-      <div className="flex items-center gap-1.5 flex-wrap">
+      <div className="flex items-center gap-1 flex-wrap">
         {/* Search */}
         <Popover open={searchOpen} onOpenChange={setSearchOpen}>
           <PopoverTrigger asChild>
@@ -303,7 +303,7 @@ export function GanttFilters({
         )}
 
         {/* Divider */}
-        <div className="h-4 w-px bg-border mx-1" />
+        <div className="h-3.5 w-px bg-border/50 mx-1" />
 
         {/* Group By */}
         <DropdownMenu>
@@ -349,7 +349,7 @@ export function GanttFilters({
         {/* Clear Filters */}
         {hasActiveFilters && (
           <>
-            <div className="h-4 w-px bg-border mx-1" />
+            <div className="h-3.5 w-px bg-border/50 mx-1" />
             <Button
               variant="ghost"
               size="sm"
@@ -365,52 +365,52 @@ export function GanttFilters({
 
       {/* Active Filter Chips */}
       {hasActiveFilters && (
-        <div className="flex items-center gap-1.5 flex-wrap">
+        <div className="flex items-center gap-1 flex-wrap">
           {searchQuery && (
             <Badge
               variant="secondary"
-              className="h-6 gap-1 pl-2 pr-1 text-xs font-normal cursor-pointer hover:bg-accent"
+              className="h-5 gap-0.5 pl-1.5 pr-0.5 text-[11px] font-normal cursor-pointer hover:bg-accent/80"
               onClick={() => onSearchChange('')}
             >
-              <Search className="h-3 w-3" />
+              <Search className="h-2.5 w-2.5" />
               "{searchQuery}"
-              <X className="h-3 w-3 ml-0.5" />
+              <X className="h-2.5 w-2.5" />
             </Badge>
           )}
           {filterStatus !== 'all' && (
             <Badge
               variant="secondary"
               className={cn(
-                'h-6 gap-1 pl-2 pr-1 text-xs font-normal cursor-pointer hover:bg-accent',
+                'h-5 gap-0.5 pl-1.5 pr-0.5 text-[11px] font-normal cursor-pointer hover:bg-accent/80',
                 STATUS_CONFIG[filterStatus].color
               )}
               onClick={() => onStatusChange('all')}
             >
               {STATUS_CONFIG[filterStatus].icon}
               {STATUS_CONFIG[filterStatus].label}
-              <X className="h-3 w-3 ml-0.5" />
+              <X className="h-2.5 w-2.5" />
             </Badge>
           )}
           {filterPriority !== 'all' && (
             <Badge
               variant="secondary"
-              className="h-6 gap-1 pl-2 pr-1 text-xs font-normal cursor-pointer hover:bg-accent"
+              className="h-5 gap-0.5 pl-1.5 pr-0.5 text-[11px] font-normal cursor-pointer hover:bg-accent/80"
               onClick={() => onPriorityChange('all')}
             >
-              <span className={cn('w-2 h-2 rounded-full', PRIORITY_CONFIG[filterPriority]?.dotColor)} />
+              <span className={cn('w-1.5 h-1.5 rounded-full', PRIORITY_CONFIG[filterPriority]?.dotColor)} />
               {PRIORITY_CONFIG[filterPriority]?.label}
-              <X className="h-3 w-3 ml-0.5" />
+              <X className="h-2.5 w-2.5" />
             </Badge>
           )}
           {filterAssignee !== 'all' && (
             <Badge
               variant="secondary"
-              className="h-6 gap-1 pl-2 pr-1 text-xs font-normal cursor-pointer hover:bg-accent"
+              className="h-5 gap-0.5 pl-1.5 pr-0.5 text-[11px] font-normal cursor-pointer hover:bg-accent/80"
               onClick={() => onAssigneeChange('all')}
             >
-              <User className="h-3 w-3" />
+              <User className="h-2.5 w-2.5" />
               {filterAssignee === 'unassigned' ? '미지정' : filterAssignee}
-              <X className="h-3 w-3 ml-0.5" />
+              <X className="h-2.5 w-2.5" />
             </Badge>
           )}
         </div>

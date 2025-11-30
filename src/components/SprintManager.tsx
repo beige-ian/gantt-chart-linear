@@ -93,18 +93,29 @@ export function SprintManager({
         <div className="flex items-center gap-3">
           <Calendar className="h-5 w-5 text-muted-foreground" />
           <Select value={currentSprintId || ''} onValueChange={onSelectSprint}>
-            <SelectTrigger className="w-[200px]">
+            <SelectTrigger className="w-[280px]">
               <SelectValue placeholder="Select Sprint" />
             </SelectTrigger>
             <SelectContent>
               {activeSprint && (
                 <SelectItem value={activeSprint.id}>
-                  {activeSprint.name} (Active)
+                  <div className="flex items-center gap-2">
+                    <span>{activeSprint.name}</span>
+                    {activeSprint.teamName && (
+                      <span className="text-xs text-muted-foreground">({activeSprint.teamName})</span>
+                    )}
+                    <span className="text-xs text-green-600">(Active)</span>
+                  </div>
                 </SelectItem>
               )}
               {planningSprints.map(sprint => (
                 <SelectItem key={sprint.id} value={sprint.id}>
-                  {sprint.name}
+                  <div className="flex items-center gap-2">
+                    <span>{sprint.name}</span>
+                    {sprint.teamName && (
+                      <span className="text-xs text-muted-foreground">({sprint.teamName})</span>
+                    )}
+                  </div>
                 </SelectItem>
               ))}
               {completedSprints.length > 0 && (
@@ -112,7 +123,12 @@ export function SprintManager({
                   <div className="px-2 py-1.5 text-xs text-muted-foreground">Completed</div>
                   {completedSprints.slice(0, 5).map(sprint => (
                     <SelectItem key={sprint.id} value={sprint.id}>
-                      {sprint.name}
+                      <div className="flex items-center gap-2">
+                        <span>{sprint.name}</span>
+                        {sprint.teamName && (
+                          <span className="text-xs text-muted-foreground">({sprint.teamName})</span>
+                        )}
+                      </div>
                     </SelectItem>
                   ))}
                 </>
@@ -206,6 +222,11 @@ export function SprintManager({
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <h3 className="font-semibold">{currentSprint.name}</h3>
+                {currentSprint.teamName && (
+                  <Badge variant="outline" className="text-xs">
+                    {currentSprint.teamName}
+                  </Badge>
+                )}
                 {getStatusBadge(currentSprint.status)}
               </div>
               {currentSprint.goal && (

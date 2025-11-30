@@ -1116,9 +1116,15 @@ export interface SprintFromLinear {
   status: 'planning' | 'active' | 'completed';
   capacity?: number;
   linearCycleId: string;
+  teamId?: string;
+  teamName?: string;
 }
 
-export function convertLinearCycleToSprint(cycle: LinearCycle): SprintFromLinear {
+export function convertLinearCycleToSprint(
+  cycle: LinearCycle,
+  teamId?: string,
+  teamName?: string
+): SprintFromLinear {
   const now = new Date();
   const startDate = new Date(cycle.startsAt);
   const endDate = new Date(cycle.endsAt);
@@ -1143,6 +1149,8 @@ export function convertLinearCycleToSprint(cycle: LinearCycle): SprintFromLinear
     status,
     capacity: cycle.issueCountScope,
     linearCycleId: cycle.id,
+    teamId,
+    teamName,
   };
 }
 

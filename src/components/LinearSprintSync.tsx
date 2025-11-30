@@ -132,8 +132,15 @@ export function LinearSprintSync({
 
     setIsLoading(true);
 
-    // Convert cycle to sprint
-    const sprintData = convertLinearCycleToSprint(selectedCycle);
+    // Get team info
+    const selectedTeam = teams.find(t => t.id === selectedTeamId);
+
+    // Convert cycle to sprint with team info
+    const sprintData = convertLinearCycleToSprint(
+      selectedCycle,
+      selectedTeamId,
+      selectedTeam?.name
+    );
 
     // Import sprint (remove id since it will be generated)
     onImportSprint({
@@ -144,6 +151,8 @@ export function LinearSprintSync({
       status: sprintData.status,
       capacity: sprintData.capacity,
       linearCycleId: sprintData.linearCycleId,
+      teamId: sprintData.teamId,
+      teamName: sprintData.teamName,
     });
 
     // Convert issues to tasks

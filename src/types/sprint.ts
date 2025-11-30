@@ -7,6 +7,8 @@ export interface Sprint {
   status: 'planning' | 'active' | 'completed';
   capacity?: number; // Total story points planned
   linearCycleId?: string; // Linear Cycle ID for sync
+  teamId?: string; // Linear Team ID
+  teamName?: string; // Linear Team name for display
 }
 
 export interface SprintTask {

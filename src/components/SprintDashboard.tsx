@@ -614,8 +614,20 @@ export function SprintDashboard() {
                 }
                 if (syncedTasks.length > 0) {
                   setSprintTasks(prev => {
+                    // Only replace tasks that match by ID or linearIssueId
+                    const syncedLinearIds = new Set(syncedTasks.map(t => t.linearIssueId).filter(Boolean));
                     const syncedIds = new Set(syncedTasks.map(t => t.id));
-                    const unchanged = prev.filter(t => !syncedIds.has(t.id) && !t.linearIssueId);
+
+                    // Keep tasks that are not being synced (different cycle or non-Linear tasks)
+                    const unchanged = prev.filter(t => {
+                      // If task has linearIssueId, check if it's being synced
+                      if (t.linearIssueId) {
+                        return !syncedLinearIds.has(t.linearIssueId);
+                      }
+                      // For non-Linear tasks, keep if ID doesn't match
+                      return !syncedIds.has(t.id);
+                    });
+
                     return [...unchanged, ...syncedTasks];
                   });
                 }

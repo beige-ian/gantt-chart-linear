@@ -595,7 +595,10 @@ export function LinearSprintSync({
                   Linear에 연결되지 않음
                 </p>
                 <p className="text-xs text-muted-foreground/70 mb-4">
-                  상단의 Linear 동기화 버튼에서 API 키를 입력하세요
+                  헤더의 <strong>"Linear 연결"</strong> 버튼을 눌러 API 키를 입력하세요
+                </p>
+                <p className="text-[10px] text-muted-foreground/50">
+                  Linear 설정 → API → Personal API keys에서 키를 생성할 수 있습니다
                 </p>
               </div>
             ) : (

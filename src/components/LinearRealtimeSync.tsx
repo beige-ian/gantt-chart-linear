@@ -330,6 +330,14 @@ export function LinearRealtimeSync({ onSyncComplete, className }: LinearRealtime
                   Linear Settings → API → Personal API keys
                 </p>
               </div>
+
+              {error && (
+                <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg text-sm text-red-600 dark:text-red-400">
+                  <p className="font-medium">연결 실패</p>
+                  <p className="text-xs mt-1">{error}</p>
+                </div>
+              )}
+
               <Button onClick={handleConnect} className="w-full" disabled={isSyncing}>
                 {isSyncing ? (
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />

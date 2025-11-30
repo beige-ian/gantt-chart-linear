@@ -75,6 +75,7 @@ export function useLinearSync(options: UseLinearSyncOptions = {}) {
   const [tasks, setTasks] = useState<SprintTask[]>([]);
   const syncIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isInitializedRef = useRef(false);
+  const syncFromLinearRef = useRef<() => void>(() => {});
 
   // Load API key and settings from localStorage
   useEffect(() => {
@@ -100,11 +101,17 @@ export function useLinearSync(options: UseLinearSyncOptions = {}) {
     }
   }, [apiKey]);
 
+  // Keep ref updated with latest syncFromLinear
+  useEffect(() => {
+    syncFromLinearRef.current = syncFromLinear;
+  }, [syncFromLinear]);
+
   // Setup auto-sync interval
   useEffect(() => {
     if (autoSync && state.isConnected && state.selectedTeamId) {
       syncIntervalRef.current = setInterval(() => {
-        syncFromLinear();
+        // Use ref to get current callback (avoid stale closure)
+        syncFromLinearRef.current();
       }, syncInterval);
 
       return () => {

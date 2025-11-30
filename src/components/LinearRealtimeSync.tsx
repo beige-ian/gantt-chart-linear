@@ -97,12 +97,8 @@ export function LinearRealtimeSync({ onSyncComplete, className }: LinearRealtime
     localStorage.setItem('linear-sync-interval', String(syncInterval));
   }, [autoSyncEnabled, syncInterval]);
 
-  // Update parent when sync completes
-  useEffect(() => {
-    if (sprints.length > 0 || tasks.length > 0) {
-      onSyncComplete?.(sprints, tasks);
-    }
-  }, [sprints, tasks, onSyncComplete]);
+  // Note: onSyncComplete is already called by useLinearSync hook via options
+  // No need for duplicate call here - removed to avoid double updates
 
   const handleConnect = async () => {
     if (!apiKeyInput.trim()) {

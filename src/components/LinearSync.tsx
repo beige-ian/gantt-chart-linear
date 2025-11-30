@@ -190,7 +190,7 @@ export function LinearSync({ onImport, importedProjectIds = [] }: LinearSyncProp
             Linear
           </Button>
         </DialogTrigger>
-      <DialogContent className="max-w-lg max-h-[85vh] flex flex-col overflow-hidden">
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-lg font-bold">Linear Import</DialogTitle>
         </DialogHeader>
@@ -273,21 +273,21 @@ export function LinearSync({ onImport, importedProjectIds = [] }: LinearSyncProp
         )}
 
         {step === 'select-projects' && (
-          <div className="flex flex-col gap-4 min-h-0 flex-1 overflow-hidden">
+          <div className="flex flex-col gap-4">
             {isLoading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
             ) : (
               <>
-                <div className="flex items-center justify-between flex-shrink-0">
+                <div className="flex items-center justify-between">
                   <Label className="text-[15px] font-semibold">Projects ({projects.length})</Label>
                   <Button variant="ghost" size="sm" onClick={handleSelectAll} className="text-[14px]">
                     {selectedProjects.size === projects.length ? 'Deselect All' : 'Select All'}
                   </Button>
                 </div>
 
-                <div className="space-y-2 flex-1 min-h-0 overflow-y-auto border border-border/50 rounded-xl p-3 bg-muted/20">
+                <div className="space-y-2 max-h-[50vh] overflow-y-auto border border-border/50 rounded-xl p-3 bg-muted/20">
                   {projects.length === 0 ? (
                     <p className="text-[14px] text-muted-foreground text-center py-4">
                       No active projects found
@@ -324,7 +324,7 @@ export function LinearSync({ onImport, importedProjectIds = [] }: LinearSyncProp
                   )}
                 </div>
 
-                <div className="flex gap-2.5 justify-between flex-shrink-0 pt-2">
+                <div className="flex gap-2.5 justify-between pt-2">
                   <Button variant="outline" onClick={() => setStep('select-team')} className="h-11 text-[15px]">
                     Back
                   </Button>

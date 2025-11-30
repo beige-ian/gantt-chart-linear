@@ -6,7 +6,7 @@ import { Card } from './ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
-import { Plus, Calendar, Target, Users, ChevronRight, Play, CheckCircle2, Clock } from 'lucide-react';
+import { Plus, Calendar, Target, Users, ChevronRight, Play, CheckCircle2, Clock, Zap } from 'lucide-react';
 import { Sprint } from '../types/sprint';
 
 interface SprintManagerProps {
@@ -220,13 +220,14 @@ export function SprintManager({
         <Card className="p-4">
           <div className="flex items-start justify-between">
             <div className="space-y-1">
+              {currentSprint.teamName && (
+                <p className="text-xs text-muted-foreground font-medium flex items-center gap-1">
+                  <Users className="h-3 w-3" />
+                  {currentSprint.teamName}
+                </p>
+              )}
               <div className="flex items-center gap-2">
                 <h3 className="font-semibold">{currentSprint.name}</h3>
-                {currentSprint.teamName && (
-                  <Badge variant="outline" className="text-xs">
-                    {currentSprint.teamName}
-                  </Badge>
-                )}
                 {getStatusBadge(currentSprint.status)}
               </div>
               {currentSprint.goal && (
@@ -239,9 +240,9 @@ export function SprintManager({
                 <Clock className="h-3 w-3" />
                 {formatDate(currentSprint.startDate)} - {formatDate(currentSprint.endDate)} ({getSprintDuration(currentSprint)})
               </p>
-              {currentSprint.capacity && (
+              {currentSprint.capacity !== undefined && currentSprint.capacity > 0 && (
                 <p className="text-sm text-muted-foreground flex items-center gap-1">
-                  <Users className="h-3 w-3" />
+                  <Zap className="h-3 w-3" />
                   Capacity: {currentSprint.capacity} points
                 </p>
               )}

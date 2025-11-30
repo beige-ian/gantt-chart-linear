@@ -264,61 +264,41 @@ export function LinearSprintSync({
       // Fetch latest issues from the linked cycle
       const issues = await fetchLinearCycleIssues(apiKey, sprint.linearCycleId);
 
-      // Update existing tasks or create new ones
-      const existingTaskIds = new Set(
+      // Get Linear issue IDs that should be in this sprint
+      const linearIssueIdsInCycle = new Set(issues.map(i => i.id));
+
+      // Find existing task Linear IDs in this sprint
+      const existingTaskLinearIds = new Set(
         sprintTasks
           .filter(t => t.sprintId === sprint.id && t.linearIssueId)
           .map(t => t.linearIssueId)
       );
 
-      const newIssues = issues.filter(i => !existingTaskIds.has(i.id));
-      const existingIssues = issues.filter(i => existingTaskIds.has(i.id));
+      // Separate new vs existing issues
+      const newIssues = issues.filter(i => !existingTaskLinearIds.has(i.id));
+      const existingIssues = issues.filter(i => existingTaskLinearIds.has(i.id));
 
-      // Import new tasks
-      if (newIssues.length > 0) {
-        const newTasks = newIssues.map(issue =>
-          convertLinearIssueToSprintTask(issue, sprint.id)
-        );
+      // Count removed tasks
+      const removedCount = sprintTasks.filter(t =>
+        t.sprintId === sprint.id &&
+        t.linearIssueId &&
+        !linearIssueIdsInCycle.has(t.linearIssueId)
+      ).length;
 
-        onImportTasks(newTasks.map(t => ({
-          name: t.name,
-          description: t.description,
-          startDate: t.startDate,
-          endDate: t.endDate,
-          progress: t.progress,
-          color: t.color,
-          status: t.status,
-          storyPoints: t.storyPoints,
-          priority: t.priority,
-          assignee: t.assignee,
-          sprintId: sprint.id,
-          linearProjectId: t.linearProjectId,
-          linearIssueId: t.linearIssueId,
-          linearParentIssueId: t.linearParentIssueId,
-          labels: t.labels,
-          stateId: t.stateId,
-          stateName: t.stateName,
-          stateType: t.stateType,
-          linearBlocks: t.linearBlocks,
-          linearBlockedBy: t.linearBlockedBy,
-        })));
-      }
-
-      // Get all Linear issue IDs that should be in this sprint
-      const linearIssueIdsInCycle = new Set(issues.map(i => i.id));
-
-      // Update existing tasks and remove tasks that are no longer in the cycle
+      // Build complete task list in ONE operation to avoid race conditions
       if (onUpdateTasks) {
-        const updatedTasks = sprintTasks
+        // Step 1: Keep tasks from OTHER sprints and non-Linear tasks unchanged
+        // Step 2: Update existing Linear tasks for THIS sprint
+        // Step 3: Remove tasks no longer in the cycle
+        const updatedExistingTasks = sprintTasks
           .map(task => {
             // Keep non-Linear tasks unchanged
             if (!task.linearIssueId) return task;
 
-            // For tasks in OTHER sprints, keep unchanged
+            // Keep tasks from OTHER sprints unchanged
             if (task.sprintId !== sprint.id) return task;
 
-            // For tasks in THIS sprint:
-            // Remove if not in Linear cycle anymore (return null to filter out)
+            // For THIS sprint: remove if not in Linear cycle anymore
             if (!linearIssueIdsInCycle.has(task.linearIssueId)) {
               return null; // Mark for removal
             }
@@ -330,7 +310,6 @@ export function LinearSprintSync({
             const converted = convertLinearIssueToSprintTask(linearIssue, sprint.id);
             return {
               ...task,
-              // Update all fields from Linear
               name: converted.name,
               description: converted.description,
               startDate: converted.startDate,
@@ -349,16 +328,39 @@ export function LinearSprintSync({
               linearParentIssueId: converted.linearParentIssueId,
             };
           })
-          .filter((task): task is SprintTask => task !== null); // Remove null (deleted) tasks
+          .filter((task): task is SprintTask => task !== null);
 
-        // Count removed tasks
-        const removedCount = sprintTasks.filter(t =>
-          t.sprintId === sprint.id &&
-          t.linearIssueId &&
-          !linearIssueIdsInCycle.has(t.linearIssueId)
-        ).length;
+        // Step 4: Add new tasks from Linear
+        const newTasks: SprintTask[] = newIssues.map(issue => {
+          const converted = convertLinearIssueToSprintTask(issue, sprint.id);
+          return {
+            id: `linear-${issue.id}`,
+            name: converted.name,
+            description: converted.description,
+            startDate: converted.startDate,
+            endDate: converted.endDate,
+            progress: converted.progress,
+            color: converted.color,
+            status: converted.status,
+            storyPoints: converted.storyPoints,
+            priority: converted.priority,
+            assignee: converted.assignee,
+            sprintId: sprint.id,
+            linearProjectId: converted.linearProjectId,
+            linearIssueId: converted.linearIssueId,
+            linearParentIssueId: converted.linearParentIssueId,
+            labels: converted.labels,
+            stateId: converted.stateId,
+            stateName: converted.stateName,
+            stateType: converted.stateType,
+            linearBlocks: converted.linearBlocks,
+            linearBlockedBy: converted.linearBlockedBy,
+          };
+        });
 
-        onUpdateTasks(updatedTasks);
+        // Combine all tasks and update in ONE call
+        const finalTaskList = [...updatedExistingTasks, ...newTasks];
+        onUpdateTasks(finalTaskList);
 
         if (removedCount > 0 && !silent) {
           toast.info(`${removedCount}개 태스크가 Linear에서 제거됨`);
@@ -394,7 +396,7 @@ export function LinearSprintSync({
     } finally {
       setIsSyncing(false);
     }
-  }, [apiKey, isValidKey, sprintTasks, sprints, teams, selectedTeamId, onImportTasks, onUpdateTasks, onUpdateSprints]);
+  }, [apiKey, isValidKey, sprintTasks, sprints, teams, selectedTeamId, onUpdateTasks, onUpdateSprints]);
 
   // Sync backlog issues (issues without cycle assignment)
   const handleSyncBacklogFromLinear = useCallback(async (silent = false) => {
@@ -407,78 +409,94 @@ export function LinearSprintSync({
       // Fetch backlog issues (not assigned to any cycle)
       const backlogIssues = await fetchLinearBacklogIssues(apiKey, selectedTeamId);
 
-      // Get existing backlog task IDs
-      const existingBacklogTaskIds = new Set(
+      // Get Linear issue IDs that should be in backlog
+      const linearIssueIdsInBacklog = new Set(backlogIssues.map(i => i.id));
+
+      // Get existing backlog task Linear IDs
+      const existingBacklogTaskLinearIds = new Set(
         sprintTasks
           .filter(t => !t.sprintId && t.linearIssueId)
           .map(t => t.linearIssueId)
       );
 
-      const newBacklogIssues = backlogIssues.filter(i => !existingBacklogTaskIds.has(i.id));
-      const existingBacklogIssues = backlogIssues.filter(i => existingBacklogTaskIds.has(i.id));
+      const newBacklogIssues = backlogIssues.filter(i => !existingBacklogTaskLinearIds.has(i.id));
+      const existingBacklogIssues = backlogIssues.filter(i => existingBacklogTaskLinearIds.has(i.id));
 
-      // Import new backlog tasks (without sprintId)
-      if (newBacklogIssues.length > 0) {
-        const newTasks = newBacklogIssues.map(issue =>
-          convertLinearIssueToSprintTask(issue, undefined) // No sprintId = backlog
-        );
+      // Build complete task list in ONE operation
+      if (onUpdateTasks) {
+        // Update existing tasks (keep sprint tasks, update backlog tasks)
+        const updatedExistingTasks = sprintTasks
+          .map(task => {
+            // Keep non-Linear tasks unchanged
+            if (!task.linearIssueId) return task;
 
-        onImportTasks(newTasks.map(t => ({
-          name: t.name,
-          description: t.description,
-          startDate: t.startDate,
-          endDate: t.endDate,
-          progress: t.progress,
-          color: t.color,
-          status: t.status,
-          storyPoints: t.storyPoints,
-          priority: t.priority,
-          assignee: t.assignee,
-          sprintId: undefined, // Backlog - no sprint
-          linearProjectId: t.linearProjectId,
-          linearIssueId: t.linearIssueId,
-          linearParentIssueId: t.linearParentIssueId,
-          labels: t.labels,
-          stateId: t.stateId,
-          stateName: t.stateName,
-          stateType: t.stateType,
-          linearBlocks: t.linearBlocks,
-          linearBlockedBy: t.linearBlockedBy,
-        })));
-      }
+            // Keep tasks WITH sprint assignment unchanged
+            if (task.sprintId) return task;
 
-      // Update existing backlog tasks
-      if (onUpdateTasks && existingBacklogIssues.length > 0) {
-        const updatedTasks = sprintTasks.map(task => {
-          if (!task.linearIssueId || task.sprintId) return task;
+            // For backlog tasks (no sprintId):
+            // Remove if no longer in backlog (might have been assigned to a cycle)
+            if (!linearIssueIdsInBacklog.has(task.linearIssueId)) {
+              return null; // Mark for removal
+            }
 
-          const linearIssue = existingBacklogIssues.find(i => i.id === task.linearIssueId);
-          if (!linearIssue) return task;
+            // Update if still in backlog
+            const linearIssue = existingBacklogIssues.find(i => i.id === task.linearIssueId);
+            if (!linearIssue) return task;
 
-          const converted = convertLinearIssueToSprintTask(linearIssue, undefined);
+            const converted = convertLinearIssueToSprintTask(linearIssue, undefined);
+            return {
+              ...task,
+              name: converted.name,
+              description: converted.description,
+              startDate: converted.startDate,
+              endDate: converted.endDate,
+              status: converted.status,
+              progress: converted.progress,
+              storyPoints: converted.storyPoints,
+              priority: converted.priority,
+              assignee: converted.assignee,
+              labels: converted.labels,
+              stateId: converted.stateId,
+              stateName: converted.stateName,
+              stateType: converted.stateType,
+              linearBlocks: converted.linearBlocks,
+              linearBlockedBy: converted.linearBlockedBy,
+              linearParentIssueId: converted.linearParentIssueId,
+            };
+          })
+          .filter((task): task is SprintTask => task !== null);
+
+        // Add new backlog tasks
+        const newTasks: SprintTask[] = newBacklogIssues.map(issue => {
+          const converted = convertLinearIssueToSprintTask(issue, undefined);
           return {
-            ...task,
-            // Update all fields from Linear
+            id: `linear-${issue.id}`,
             name: converted.name,
             description: converted.description,
             startDate: converted.startDate,
             endDate: converted.endDate,
-            status: converted.status,
             progress: converted.progress,
+            color: converted.color,
+            status: converted.status,
             storyPoints: converted.storyPoints,
             priority: converted.priority,
             assignee: converted.assignee,
+            sprintId: undefined, // Backlog - no sprint
+            linearProjectId: converted.linearProjectId,
+            linearIssueId: converted.linearIssueId,
+            linearParentIssueId: converted.linearParentIssueId,
             labels: converted.labels,
             stateId: converted.stateId,
             stateName: converted.stateName,
             stateType: converted.stateType,
             linearBlocks: converted.linearBlocks,
             linearBlockedBy: converted.linearBlockedBy,
-            linearParentIssueId: converted.linearParentIssueId,
           };
         });
 
-        onUpdateTasks(updatedTasks);
+        // Combine and update in ONE call
+        const finalTaskList = [...updatedExistingTasks, ...newTasks];
+        onUpdateTasks(finalTaskList);
       }
 
       if (!silent) {
@@ -496,7 +514,7 @@ export function LinearSprintSync({
     } finally {
       setIsSyncing(false);
     }
-  }, [apiKey, isValidKey, selectedTeamId, sprintTasks, onImportTasks, onUpdateTasks]);
+  }, [apiKey, isValidKey, selectedTeamId, sprintTasks, onUpdateTasks]);
 
   // Sync all linked sprints AND backlog
   const handleSyncAllFromLinear = async (silent = false) => {

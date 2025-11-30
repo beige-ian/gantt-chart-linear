@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import { GanttSkeleton } from './GanttSkeleton';
 import { ConfirmDialog } from './ConfirmDialog';
 import { ExportMenu } from './ExportMenu';
+import { GanttFilters, GanttStatusFilter, GanttGroupBy } from './GanttFilters';
 
 // Simple Task Form Component
 interface SimpleTaskFormProps {
@@ -617,10 +618,10 @@ export function GanttChart({ className }: GanttChartProps) {
   const [importedProjectIds, setImportedProjectIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'completed' | 'in-progress' | 'not-started'>('all');
+  const [filterStatus, setFilterStatus] = useState<GanttStatusFilter>('all');
   const [filterAssignee, setFilterAssignee] = useState<string>('all');
   const [filterPriority, setFilterPriority] = useState<string>('all');
-  const [groupBy, setGroupBy] = useState<'none' | 'assignee' | 'priority' | 'team' | 'status'>('none');
+  const [groupBy, setGroupBy] = useState<GanttGroupBy>('none');
   const [showStats, setShowStats] = useState(false);
   const [ganttSettings, setGanttSettings] = useState<GanttSettingsData>(defaultSettings);
   const [taskColumnWidth, setTaskColumnWidth] = useState(360);
@@ -1685,122 +1686,24 @@ export function GanttChart({ className }: GanttChartProps) {
             </div>
           </div>
 
-          {/* Search and Filter Controls */}
+          {/* Linear-style Filter Controls */}
           {tasks.length > 0 && (
-            <div className="flex flex-col md:flex-row gap-2 mb-4 flex-wrap">
-              <div className="relative flex-1 max-w-xs">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                <Input
-                  placeholder="태스크 검색..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="h-8 pl-8 pr-8 text-xs bg-muted/30 border-transparent focus:border-border focus:bg-background transition-colors"
-                />
-                {searchQuery && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-0.5 top-1/2 -translate-y-1/2 h-6 w-6 hover:bg-transparent"
-                    onClick={() => setSearchQuery('')}
-                  >
-                    <X className="h-3 w-3 text-muted-foreground" />
-                  </Button>
-                )}
-              </div>
-              <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as typeof filterStatus)}>
-                <SelectTrigger className="w-[120px] h-8 text-xs bg-muted/30 border-transparent hover:border-border focus:border-border">
-                  <Filter className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
-                  <SelectValue placeholder="상태" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" className="text-xs">전체 상태</SelectItem>
-                  <SelectItem value="completed" className="text-xs">완료</SelectItem>
-                  <SelectItem value="in-progress" className="text-xs">진행중</SelectItem>
-                  <SelectItem value="not-started" className="text-xs">시작전</SelectItem>
-                </SelectContent>
-              </Select>
-              {/* Assignee Filter */}
-              <Select value={filterAssignee} onValueChange={setFilterAssignee}>
-                <SelectTrigger className="w-[130px] h-8 text-xs bg-muted/30 border-transparent hover:border-border focus:border-border">
-                  <SelectValue placeholder="담당자" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" className="text-xs">전체 담당자</SelectItem>
-                  <SelectItem value="unassigned" className="text-xs">미지정</SelectItem>
-                  {uniqueAssignees.map((assignee) => (
-                    <SelectItem key={assignee} value={assignee} className="text-xs">
-                      {assignee}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {/* Priority Filter */}
-              <Select value={filterPriority} onValueChange={setFilterPriority}>
-                <SelectTrigger className="w-[120px] h-8 text-xs bg-muted/30 border-transparent hover:border-border focus:border-border">
-                  <SelectValue placeholder="우선순위" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" className="text-xs">전체 우선순위</SelectItem>
-                  <SelectItem value="urgent" className="text-xs">
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-red-500" />
-                      긴급
-                    </span>
-                  </SelectItem>
-                  <SelectItem value="high" className="text-xs">
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-orange-500" />
-                      높음
-                    </span>
-                  </SelectItem>
-                  <SelectItem value="medium" className="text-xs">
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-yellow-500" />
-                      보통
-                    </span>
-                  </SelectItem>
-                  <SelectItem value="low" className="text-xs">
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-green-500" />
-                      낮음
-                    </span>
-                  </SelectItem>
-                  <SelectItem value="none" className="text-xs">
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-gray-400" />
-                      없음
-                    </span>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-              {/* Group By */}
-              <Select value={groupBy} onValueChange={(v) => setGroupBy(v as typeof groupBy)}>
-                <SelectTrigger className="w-[120px] h-8 text-xs bg-muted/30 border-transparent hover:border-border focus:border-border">
-                  <Layers className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
-                  <SelectValue placeholder="그룹" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none" className="text-xs">그룹 없음</SelectItem>
-                  <SelectItem value="assignee" className="text-xs">담당자별</SelectItem>
-                  <SelectItem value="priority" className="text-xs">우선순위별</SelectItem>
-                  <SelectItem value="team" className="text-xs">팀별</SelectItem>
-                  <SelectItem value="status" className="text-xs">상태별</SelectItem>
-                </SelectContent>
-              </Select>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant={showStats ? 'secondary' : 'outline'}
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => setShowStats(!showStats)}
-                  >
-                    <BarChart3 className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>통계 보기</TooltipContent>
-              </Tooltip>
-            </div>
+            <GanttFilters
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              filterStatus={filterStatus}
+              onStatusChange={setFilterStatus}
+              filterAssignee={filterAssignee}
+              onAssigneeChange={setFilterAssignee}
+              filterPriority={filterPriority}
+              onPriorityChange={setFilterPriority}
+              groupBy={groupBy}
+              onGroupByChange={setGroupBy}
+              showStats={showStats}
+              onShowStatsChange={setShowStats}
+              assignees={uniqueAssignees}
+              className="mb-4"
+            />
           )}
 
           {/* Statistics Panel - Premium Design */}

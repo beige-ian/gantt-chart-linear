@@ -1,6 +1,9 @@
 // Linear API Service
-// Use proxy in development to avoid CORS issues
-const LINEAR_API_URL = '/api/linear/graphql';
+// In development, use Vite proxy to avoid CORS issues
+// In production, call Linear API directly (Linear supports CORS with API key)
+const LINEAR_API_URL = import.meta.env.DEV
+  ? '/api/linear/graphql'
+  : 'https://api.linear.app/graphql';
 
 export interface LinearTeam {
   id: string;

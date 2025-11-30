@@ -1028,6 +1028,8 @@ export interface SprintTaskFromLinear {
   priority: 'urgent' | 'high' | 'medium' | 'low' | 'none';
   assignee?: string;
   assigneeAvatarUrl?: string;
+  team?: string;
+  teamId?: string;
   sprintId?: string;
   linearProjectId?: string;
   linearIssueId: string;
@@ -1106,6 +1108,8 @@ export function convertLinearIssueToSprintTask(
     priority,
     assignee: issue.assignee?.name,
     assigneeAvatarUrl: issue.assignee?.avatarUrl,
+    team: issue.team?.name,
+    teamId: issue.team?.id,
     sprintId,
     linearProjectId: issue.project?.id,
     linearIssueId: issue.id,

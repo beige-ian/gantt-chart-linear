@@ -25,6 +25,8 @@ export interface SprintTask {
   assignee?: string;
   assigneeId?: string;
   assigneeAvatarUrl?: string;
+  team?: string;
+  teamId?: string;
   sprintId?: string;
   parentId?: string;
   dependencies?: string[];

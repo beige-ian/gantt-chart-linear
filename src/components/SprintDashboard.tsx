@@ -519,6 +519,16 @@ export function SprintDashboard() {
     return Array.from(assignees).sort();
   }, [currentSprint, currentSprintTasks, sprintTasks]);
 
+  // Get unique teams for filter dropdown
+  const uniqueTeams = useMemo(() => {
+    const teams = new Set<string>();
+    const tasksToCheck = currentSprint ? currentSprintTasks : sprintTasks;
+    tasksToCheck.forEach(t => {
+      if (t.team) teams.add(t.team);
+    });
+    return Array.from(teams).sort();
+  }, [currentSprint, currentSprintTasks, sprintTasks]);
+
   // Apply filters and sorting to tasks (Linear-style)
   const filteredTasks = useMemo(() => {
     const tasksToFilter = currentSprint ? currentSprintTasks : sprintTasks;
@@ -680,6 +690,7 @@ export function SprintDashboard() {
             onFiltersChange={setTaskFilters}
             onSortChange={setTaskSort}
             assignees={uniqueAssignees}
+            teams={uniqueTeams}
             showStatusFilter={false}
           />
 

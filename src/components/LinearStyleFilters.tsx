@@ -38,6 +38,7 @@ import {
   SignalZero,
   Zap,
   User,
+  Users,
   SortAsc,
   SortDesc,
   Calendar,
@@ -51,6 +52,7 @@ export interface LinearFilterOptions {
   status: SprintTask['status'][];
   priority: SprintTask['priority'][];
   assignee: string[];
+  team: string[];
   labels: string[];
   hasDeadlineSoon: boolean;
   isOverdue: boolean;
@@ -67,6 +69,7 @@ interface LinearStyleFiltersProps {
   onFiltersChange: (filters: LinearFilterOptions) => void;
   onSortChange: (sort: LinearSortOptions) => void;
   assignees: string[];
+  teams?: string[];
   labels?: string[];
   showStatusFilter?: boolean;
   className?: string;
@@ -106,12 +109,14 @@ export function LinearStyleFilters({
   onFiltersChange,
   onSortChange,
   assignees,
+  teams = [],
   labels = [],
   showStatusFilter = true,
   className,
 }: LinearStyleFiltersProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [assigneeOpen, setAssigneeOpen] = useState(false);
+  const [teamOpen, setTeamOpen] = useState(false);
 
   // Count active filters
   const activeFilterCount = useMemo(() => {
@@ -120,6 +125,7 @@ export function LinearStyleFilters({
       filters.status.length,
       filters.priority.length,
       filters.assignee.length,
+      filters.team.length,
       filters.labels?.length || 0,
       filters.hasDeadlineSoon ? 1 : 0,
       filters.isOverdue ? 1 : 0,
@@ -132,6 +138,7 @@ export function LinearStyleFilters({
       status: [],
       priority: [],
       assignee: [],
+      team: [],
       labels: [],
       hasDeadlineSoon: false,
       isOverdue: false,
@@ -159,6 +166,12 @@ export function LinearStyleFilters({
         onFiltersChange({
           ...filters,
           assignee: filters.assignee.filter((a) => a !== value),
+        });
+        break;
+      case 'team':
+        onFiltersChange({
+          ...filters,
+          team: filters.team.filter((t) => t !== value),
         });
         break;
       case 'deadline':
@@ -208,6 +221,20 @@ export function LinearStyleFilters({
       onFiltersChange({
         ...filters,
         assignee: [...filters.assignee, assignee],
+      });
+    }
+  };
+
+  const toggleTeam = (team: string) => {
+    if (filters.team.includes(team)) {
+      onFiltersChange({
+        ...filters,
+        team: filters.team.filter((t) => t !== team),
+      });
+    } else {
+      onFiltersChange({
+        ...filters,
+        team: [...filters.team, team],
       });
     }
   };
@@ -392,6 +419,64 @@ export function LinearStyleFilters({
           </Popover>
         )}
 
+        {/* Team Filter */}
+        {teams.length > 0 && (
+          <Popover open={teamOpen} onOpenChange={setTeamOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant={filters.team.length > 0 ? 'secondary' : 'ghost'}
+                size="sm"
+                className={cn(
+                  'h-7 gap-1 text-xs font-normal',
+                  filters.team.length > 0 && 'bg-accent'
+                )}
+              >
+                <Users className="h-3.5 w-3.5" />
+                팀
+                {filters.team.length > 0 && (
+                  <Badge variant="secondary" className="h-4 px-1 text-[10px] ml-0.5">
+                    {filters.team.length}
+                  </Badge>
+                )}
+                <ChevronDown className="h-3 w-3 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-52 p-0" align="start">
+              <Command>
+                <CommandInput placeholder="팀 검색..." className="h-8 text-xs" />
+                <CommandList>
+                  <CommandEmpty className="py-2 text-xs text-center">
+                    결과 없음
+                  </CommandEmpty>
+                  <CommandGroup>
+                    {teams.map((team) => (
+                      <CommandItem
+                        key={team}
+                        onSelect={() => toggleTeam(team)}
+                        className="gap-2 text-xs"
+                      >
+                        <div
+                          className={cn(
+                            'h-4 w-4 border rounded flex items-center justify-center',
+                            filters.team.includes(team)
+                              ? 'bg-primary border-primary'
+                              : 'border-muted-foreground/30'
+                          )}
+                        >
+                          {filters.team.includes(team) && (
+                            <CheckCircle2 className="h-3 w-3 text-primary-foreground" />
+                          )}
+                        </div>
+                        <span className="truncate">{team}</span>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        )}
+
         {/* Due Date Filters */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -546,6 +631,18 @@ export function LinearStyleFilters({
               <X className="h-2.5 w-2.5" />
             </Badge>
           ))}
+          {filters.team.map((team) => (
+            <Badge
+              key={team}
+              variant="secondary"
+              className="h-5 gap-0.5 pl-1.5 pr-0.5 text-[11px] font-normal cursor-pointer hover:bg-accent/80"
+              onClick={() => removeFilter('team', team)}
+            >
+              <Users className="h-2.5 w-2.5" />
+              {team}
+              <X className="h-2.5 w-2.5" />
+            </Badge>
+          ))}
           {filters.hasDeadlineSoon && (
             <Badge
               variant="secondary"
@@ -607,6 +704,11 @@ export function applyLinearFiltersAndSort(
   // Apply assignee filter
   if (filters.assignee.length > 0) {
     result = result.filter((task) => task.assignee && filters.assignee.includes(task.assignee));
+  }
+
+  // Apply team filter
+  if (filters.team.length > 0) {
+    result = result.filter((task) => task.team && filters.team.includes(task.team));
   }
 
   // Apply labels filter
@@ -699,6 +801,7 @@ export const defaultLinearFilters: LinearFilterOptions = {
   status: [],
   priority: [],
   assignee: [],
+  team: [],
   labels: [],
   hasDeadlineSoon: false,
   isOverdue: false,

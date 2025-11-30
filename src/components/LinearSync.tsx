@@ -190,7 +190,7 @@ export function LinearSync({ onImport, importedProjectIds = [] }: LinearSyncProp
             Linear
           </Button>
         </DialogTrigger>
-      <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-lg max-h-[85vh] flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle className="text-lg font-bold">Linear Import</DialogTitle>
         </DialogHeader>
@@ -236,7 +236,7 @@ export function LinearSync({ onImport, importedProjectIds = [] }: LinearSyncProp
         )}
 
         {step === 'select-team' && (
-          <div className="space-y-5">
+          <div className="flex flex-col gap-5 min-h-0">
             <div className="space-y-2.5">
               <Label className="text-[15px] font-semibold">Select Team</Label>
               <Select value={selectedTeam} onValueChange={setSelectedTeam}>
@@ -253,7 +253,7 @@ export function LinearSync({ onImport, importedProjectIds = [] }: LinearSyncProp
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex gap-2.5">
+            <div className="flex gap-2.5 pt-2">
               <Button variant="outline" onClick={() => setStep('api-key')} className="h-11 text-[15px]">
                 Back
               </Button>
@@ -273,21 +273,21 @@ export function LinearSync({ onImport, importedProjectIds = [] }: LinearSyncProp
         )}
 
         {step === 'select-projects' && (
-          <div className="space-y-5">
+          <div className="flex flex-col gap-4 min-h-0 flex-1 overflow-hidden">
             {isLoading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
             ) : (
               <>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between flex-shrink-0">
                   <Label className="text-[15px] font-semibold">Projects ({projects.length})</Label>
                   <Button variant="ghost" size="sm" onClick={handleSelectAll} className="text-[14px]">
                     {selectedProjects.size === projects.length ? 'Deselect All' : 'Select All'}
                   </Button>
                 </div>
 
-                <div className="space-y-2 max-h-[40vh] overflow-y-auto border border-border/50 rounded-xl p-3 bg-muted/20">
+                <div className="space-y-2 flex-1 min-h-0 overflow-y-auto border border-border/50 rounded-xl p-3 bg-muted/20">
                   {projects.length === 0 ? (
                     <p className="text-[14px] text-muted-foreground text-center py-4">
                       No active projects found
@@ -306,7 +306,7 @@ export function LinearSync({ onImport, importedProjectIds = [] }: LinearSyncProp
                         />
                         <div className="flex-1 min-w-0">
                           <div className="font-semibold text-[15px] truncate leading-snug">{project.name}</div>
-                          <div className="text-[13px] text-muted-foreground flex gap-2 mt-1">
+                          <div className="text-[13px] text-muted-foreground flex gap-2 mt-1 flex-wrap">
                             <span className="px-2 py-0.5 bg-muted rounded-md font-medium">
                               {getProjectStateLabel(project.state)}
                             </span>
@@ -324,7 +324,7 @@ export function LinearSync({ onImport, importedProjectIds = [] }: LinearSyncProp
                   )}
                 </div>
 
-                <div className="flex gap-2.5 justify-between">
+                <div className="flex gap-2.5 justify-between flex-shrink-0 pt-2">
                   <Button variant="outline" onClick={() => setStep('select-team')} className="h-11 text-[15px]">
                     Back
                   </Button>

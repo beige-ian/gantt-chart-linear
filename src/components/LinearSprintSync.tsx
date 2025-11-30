@@ -315,10 +315,17 @@ export function LinearSprintSync({
           const converted = convertLinearIssueToSprintTask(linearIssue, sprint.id);
           return {
             ...task,
+            // Update all fields from Linear
+            name: converted.name,
+            description: converted.description,
+            startDate: converted.startDate,
+            endDate: converted.endDate,
             status: converted.status,
             progress: converted.progress,
             storyPoints: converted.storyPoints,
+            priority: converted.priority,
             assignee: converted.assignee,
+            labels: converted.labels,
             stateId: converted.stateId,
             stateName: converted.stateName,
             stateType: converted.stateType,
@@ -419,12 +426,17 @@ export function LinearSprintSync({
           const converted = convertLinearIssueToSprintTask(linearIssue, undefined);
           return {
             ...task,
+            // Update all fields from Linear
             name: converted.name,
+            description: converted.description,
+            startDate: converted.startDate,
+            endDate: converted.endDate,
             status: converted.status,
             progress: converted.progress,
             storyPoints: converted.storyPoints,
-            assignee: converted.assignee,
             priority: converted.priority,
+            assignee: converted.assignee,
+            labels: converted.labels,
             stateId: converted.stateId,
             stateName: converted.stateName,
             stateType: converted.stateType,
@@ -575,33 +587,18 @@ export function LinearSprintSync({
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto">
-            {/* API Key (always visible) */}
-            <div className="space-y-2 mb-4">
-              <Label htmlFor="apiKey">Linear API Key</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="apiKey"
-                  type="password"
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  placeholder="lin_api_..."
-                  className="flex-1"
-                />
-                {isValidKey ? (
-                  <Badge variant="default" className="gap-1 shrink-0">
-                    <Check className="h-3 w-3" />
-                    연결됨
-                  </Badge>
-                ) : apiKey.length > 0 && (
-                  <Badge variant="destructive" className="gap-1 shrink-0">
-                    <AlertCircle className="h-3 w-3" />
-                    무효
-                  </Badge>
-                )}
+            {/* Connection Status */}
+            {!isValidKey ? (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <AlertCircle className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                <p className="text-sm font-medium text-muted-foreground mb-2">
+                  Linear에 연결되지 않음
+                </p>
+                <p className="text-xs text-muted-foreground/70 mb-4">
+                  상단의 Linear 동기화 버튼에서 API 키를 입력하세요
+                </p>
               </div>
-            </div>
-
-            {isValidKey && (
+            ) : (
               <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
                 <TabsList className="grid w-full grid-cols-3">
                   <TabsTrigger value="import" className="gap-1">

@@ -372,6 +372,7 @@ export async function fetchLinearIssues(
         nodes {
           id
           title
+          description
           state {
             id
             name
@@ -542,6 +543,7 @@ export async function fetchLinearCycleIssues(
           nodes {
             id
             title
+            description
             state {
               id
               name
@@ -635,6 +637,7 @@ export async function fetchLinearBacklogIssues(
         nodes {
           id
           title
+          description
           state {
             id
             name
@@ -1093,6 +1096,7 @@ export function convertLinearIssueToSprintTask(
   return {
     id: `linear-${issue.id}`,
     name: issue.title,
+    description: issue.description || undefined,
     startDate,
     endDate,
     progress,

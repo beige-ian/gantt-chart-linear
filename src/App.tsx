@@ -29,7 +29,6 @@ import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
 import { CommandPalette } from './components/CommandPalette';
 import { IssueDetailPanel } from './components/IssueDetailPanel';
 import { IssueListView } from './components/IssueListView';
-import { LinearConnection } from './components/LinearConnection';
 import { AutoSaveIndicator, useAutoSave } from './components/AutoSaveIndicator';
 import { SprintTask } from './types/sprint';
 import { useTaskStore } from './stores/useTaskStore';
@@ -397,9 +396,6 @@ function AppContent() {
         <div className="flex items-center gap-3">
           {/* Auto-save indicator */}
           <AutoSaveIndicator status={autoSave.status} lastSaved={autoSave.lastSaved} />
-
-          {/* Linear Integration Group */}
-          <LinearConnection />
 
           {/* Separator */}
           <div className="hidden sm:block h-6 w-px bg-border" />

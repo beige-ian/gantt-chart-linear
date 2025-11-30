@@ -144,6 +144,11 @@ export function LinearSprintSync({
       selectedTeam?.name
     );
 
+    // Calculate sprint ID (same logic as handleImportSprint in SprintDashboard)
+    const expectedSprintId = sprintData.linearCycleId
+      ? `linear-cycle-${sprintData.linearCycleId}`
+      : Date.now().toString();
+
     // Import sprint (remove id since it will be generated)
     onImportSprint({
       name: sprintData.name,
@@ -157,12 +162,12 @@ export function LinearSprintSync({
       teamName: sprintData.teamName,
     });
 
-    // Convert issues to tasks
+    // Convert issues to tasks - IMPORTANT: pass the sprintId explicitly
     const tasks = cycleIssues.map(issue =>
-      convertLinearIssueToSprintTask(issue)
+      convertLinearIssueToSprintTask(issue, expectedSprintId)
     );
 
-    // Import tasks
+    // Import tasks with explicit sprintId to avoid race condition
     if (tasks.length > 0) {
       onImportTasks(tasks.map(t => ({
         name: t.name,
@@ -175,6 +180,7 @@ export function LinearSprintSync({
         storyPoints: t.storyPoints,
         priority: t.priority,
         assignee: t.assignee,
+        sprintId: expectedSprintId, // Explicitly set sprintId
         linearProjectId: t.linearProjectId,
         linearIssueId: t.linearIssueId,
         linearParentIssueId: t.linearParentIssueId,

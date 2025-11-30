@@ -36,6 +36,7 @@ interface LinearSprintSyncProps {
   onImportTasks: (tasks: Omit<SprintTask, 'id'>[]) => void;
   onLinkSprint: (sprintId: string, linearCycleId: string) => void;
   onUpdateTasks?: (tasks: SprintTask[]) => void;
+  onUpdateSprints?: (sprints: Sprint[]) => void;
 }
 
 export function LinearSprintSync({
@@ -45,6 +46,7 @@ export function LinearSprintSync({
   onImportTasks,
   onLinkSprint,
   onUpdateTasks,
+  onUpdateSprints,
 }: LinearSprintSyncProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'import' | 'sync' | 'settings'>('import');
@@ -329,6 +331,19 @@ export function LinearSprintSync({
         onUpdateTasks(updatedTasks);
       }
 
+      // Update sprint team info if missing
+      if (onUpdateSprints && (!sprint.teamId || !sprint.teamName) && selectedTeamId) {
+        const selectedTeam = teams.find(t => t.id === selectedTeamId);
+        if (selectedTeam) {
+          const updatedSprints = sprints.map(s =>
+            s.id === sprint.id
+              ? { ...s, teamId: selectedTeamId, teamName: selectedTeam.name }
+              : s
+          );
+          onUpdateSprints(updatedSprints);
+        }
+      }
+
       setLastSyncTime(new Date());
       toast.success('Linear에서 동기화 완료', {
         description: `${newIssues.length}개 새 이슈, ${existingIssues.length}개 업데이트`,
@@ -340,7 +355,7 @@ export function LinearSprintSync({
     } finally {
       setIsSyncing(false);
     }
-  }, [apiKey, isValidKey, sprintTasks, onImportTasks, onUpdateTasks]);
+  }, [apiKey, isValidKey, sprintTasks, sprints, teams, selectedTeamId, onImportTasks, onUpdateTasks, onUpdateSprints]);
 
   // Sync backlog issues (issues without cycle assignment)
   const handleSyncBacklogFromLinear = useCallback(async () => {

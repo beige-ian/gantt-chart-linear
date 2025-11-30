@@ -596,6 +596,7 @@ export function SprintDashboard() {
               onImportTasks={handleImportTasks}
               onLinkSprint={handleLinkSprint}
               onUpdateTasks={handleUpdateTasks}
+              onUpdateSprints={setSprints}
             />
             <LinearCycleManager
               selectedCycleId={currentSprint?.linearCycleId}

@@ -961,6 +961,17 @@ function convertLinearPriority(priority: number): 'urgent' | 'high' | 'medium' |
   }
 }
 
+// Convert SprintTask priority to Linear priority (0-4)
+export function convertToLinearPriority(priority: 'urgent' | 'high' | 'medium' | 'low' | 'none'): number {
+  switch (priority) {
+    case 'urgent': return 1;
+    case 'high': return 2;
+    case 'medium': return 3;
+    case 'low': return 4;
+    default: return 0;
+  }
+}
+
 // Convert Linear state name to SprintTask status
 function convertLinearState(stateName: string): 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done' {
   const lowerState = stateName.toLowerCase();

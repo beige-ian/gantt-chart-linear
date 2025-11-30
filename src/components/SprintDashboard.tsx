@@ -31,6 +31,8 @@ import {
   deleteLinearIssue,
   fetchLinearTeams,
   formatDateForLinear,
+  convertToLinearPriority,
+  updateLinearIssueExtended,
 } from '../services/linear';
 
 type ViewMode = 'board' | 'gantt' | 'analytics';
@@ -170,6 +172,36 @@ export function SprintDashboard() {
             } else {
               toast.warning('Linear 상태 매핑 없음', { description: `"${status}"에 해당하는 상태를 찾을 수 없음` });
             }
+          }
+        } catch (error) {
+          console.error('Failed to sync with Linear:', error);
+          toast.error('Linear 동기화 실패', { description: String(error) });
+        }
+      }
+    }
+  };
+
+  const handlePriorityChange = async (taskId: string, priority: SprintTask['priority']) => {
+    const task = sprintTasks.find(t => t.id === taskId);
+
+    // Optimistic update
+    setSprintTasks(sprintTasks.map(t =>
+      t.id === taskId ? { ...t, priority } : t
+    ));
+
+    // Sync with Linear if task is linked
+    if (task?.linearIssueId) {
+      const apiKey = localStorage.getItem('linear-api-key');
+      if (apiKey) {
+        try {
+          const linearPriority = convertToLinearPriority(priority);
+          const success = await updateLinearIssueExtended(apiKey, task.linearIssueId, {
+            priority: linearPriority,
+          });
+          if (success) {
+            toast.success('Linear 동기화 완료', { description: '우선순위 업데이트됨' });
+          } else {
+            toast.error('Linear 우선순위 변경 실패');
           }
         } catch (error) {
           console.error('Failed to sync with Linear:', error);
@@ -650,6 +682,8 @@ export function SprintDashboard() {
                   t.id === taskId ? { ...t, sprintId: undefined } : t
                 ));
               }}
+              onStatusChange={handleStatusChange}
+              onPriorityChange={handlePriorityChange}
               currentSprintId={currentSprintId}
             />
           )}

@@ -407,22 +407,22 @@ export function TaskBar({
       {/* Left Resize Handle */}
       {onDateChange && !task.isMilestone && (
         <div
-          className={`absolute top-0 bottom-0 w-6 cursor-ew-resize z-40 touch-none transition-all duration-150 ${
-            isResizingLeft ? 'scale-110' : ''
+          className={`absolute top-0 bottom-0 w-8 cursor-ew-resize z-40 touch-none transition-all duration-100 ${
+            isResizingLeft ? 'scale-x-125' : ''
           }`}
           style={{
-            left: '-4px',
+            left: '-6px',
             opacity: isHovered || isResizingLeft || isResizingRight || isDragging ? 1 : 0,
           }}
           onMouseDown={(e) => { e.stopPropagation(); handleResizeLeftStart(e); }}
           onTouchStart={(e) => { e.stopPropagation(); handleResizeLeftStart(e); }}
         >
-          <div className={`absolute inset-y-0 left-1 w-3 flex items-center justify-center rounded-l transition-colors ${
-            isResizingLeft ? 'bg-white/40' : 'bg-black/10 hover:bg-white/30'
+          <div className={`absolute inset-y-0 left-1 w-4 flex items-center justify-center rounded-l-md transition-all ${
+            isResizingLeft ? 'bg-white/60 shadow-lg' : 'bg-black/20 hover:bg-white/40'
           }`}>
             <div className="flex items-center gap-0.5">
-              <div className="w-0.5 h-4 bg-white rounded-full shadow-sm" />
-              <div className="w-0.5 h-4 bg-white rounded-full shadow-sm" />
+              <div className={`w-0.5 rounded-full shadow ${isResizingLeft ? 'h-6 bg-white' : 'h-5 bg-white/90'}`} />
+              <div className={`w-0.5 rounded-full shadow ${isResizingLeft ? 'h-6 bg-white' : 'h-5 bg-white/90'}`} />
             </div>
           </div>
         </div>
@@ -431,22 +431,22 @@ export function TaskBar({
       {/* Right Resize Handle */}
       {onDateChange && !task.isMilestone && (
         <div
-          className={`absolute top-0 bottom-0 w-6 cursor-ew-resize z-40 touch-none transition-all duration-150 ${
-            isResizingRight ? 'scale-110' : ''
+          className={`absolute top-0 bottom-0 w-8 cursor-ew-resize z-40 touch-none transition-all duration-100 ${
+            isResizingRight ? 'scale-x-125' : ''
           }`}
           style={{
-            right: '-4px',
+            right: '-6px',
             opacity: isHovered || isResizingLeft || isResizingRight || isDragging ? 1 : 0,
           }}
           onMouseDown={(e) => { e.stopPropagation(); handleResizeRightStart(e); }}
           onTouchStart={(e) => { e.stopPropagation(); handleResizeRightStart(e); }}
         >
-          <div className={`absolute inset-y-0 right-1 w-3 flex items-center justify-center rounded-r transition-colors ${
-            isResizingRight ? 'bg-white/40' : 'bg-black/10 hover:bg-white/30'
+          <div className={`absolute inset-y-0 right-1 w-4 flex items-center justify-center rounded-r-md transition-all ${
+            isResizingRight ? 'bg-white/60 shadow-lg' : 'bg-black/20 hover:bg-white/40'
           }`}>
             <div className="flex items-center gap-0.5">
-              <div className="w-0.5 h-4 bg-white rounded-full shadow-sm" />
-              <div className="w-0.5 h-4 bg-white rounded-full shadow-sm" />
+              <div className={`w-0.5 rounded-full shadow ${isResizingRight ? 'h-6 bg-white' : 'h-5 bg-white/90'}`} />
+              <div className={`w-0.5 rounded-full shadow ${isResizingRight ? 'h-6 bg-white' : 'h-5 bg-white/90'}`} />
             </div>
           </div>
         </div>

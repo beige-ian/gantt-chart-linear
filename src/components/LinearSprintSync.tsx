@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -54,6 +54,7 @@ export function LinearSprintSync({
   const [isValidKey, setIsValidKey] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const isSyncingRef = useRef(false); // Ref to track current syncing state for interval callbacks
   const [teams, setTeams] = useState<LinearTeam[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState<string>('');
   const [cycles, setCycles] = useState<LinearCycle[]>([]);
@@ -64,6 +65,11 @@ export function LinearSprintSync({
   const [autoSync, setAutoSync] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
+
+  // Keep ref in sync with state for interval callbacks
+  useEffect(() => {
+    isSyncingRef.current = isSyncing;
+  }, [isSyncing]);
 
   // Load API key and selected team from localStorage
   useEffect(() => {
@@ -337,6 +343,7 @@ export function LinearSprintSync({
           .filter((task): task is SprintTask => task !== null);
 
         // Step 4: Add new tasks from Linear
+        const newIssueIds = new Set(newIssues.map(i => i.id));
         const newTasks: SprintTask[] = newIssues.map(issue => {
           const converted = convertLinearIssueToSprintTask(issue, sprint.id);
           return {
@@ -364,8 +371,11 @@ export function LinearSprintSync({
           };
         });
 
-        // Combine all tasks and update in ONE call
-        const finalTaskList = [...updatedExistingTasks, ...newTasks];
+        // Combine - but first remove any duplicates (e.g., task was in backlog, now in this cycle)
+        const finalTaskList = [
+          ...updatedExistingTasks.filter(t => !t.linearIssueId || !newIssueIds.has(t.linearIssueId)),
+          ...newTasks,
+        ];
         onUpdateTasks(finalTaskList);
 
         if (removedCount > 0 && !silent) {
@@ -472,7 +482,8 @@ export function LinearSprintSync({
           })
           .filter((task): task is SprintTask => task !== null);
 
-        // Add new backlog tasks
+        // Add new backlog tasks - check for duplicates first
+        const newBacklogIssueIds = new Set(newBacklogIssues.map(i => i.id));
         const newTasks: SprintTask[] = newBacklogIssues.map(issue => {
           const converted = convertLinearIssueToSprintTask(issue, undefined);
           return {
@@ -500,8 +511,11 @@ export function LinearSprintSync({
           };
         });
 
-        // Combine and update in ONE call
-        const finalTaskList = [...updatedExistingTasks, ...newTasks];
+        // Combine - remove duplicates first (e.g., task was in a sprint, now in backlog)
+        const finalTaskList = [
+          ...updatedExistingTasks.filter(t => !t.linearIssueId || !newBacklogIssueIds.has(t.linearIssueId)),
+          ...newTasks,
+        ];
         onUpdateTasks(finalTaskList);
       }
 
@@ -530,15 +544,23 @@ export function LinearSprintSync({
     if (!silent) setSyncError(null);
 
     try {
-      // Step 1: Fetch ALL data in parallel
+      // Step 1: Fetch ALL data in parallel - use Promise.allSettled for resilience
       const sprintDataPromises = linkedSprints.map(async (sprint) => {
-        if (!sprint.linearCycleId) return { sprint, issues: [] };
-        const issues = await fetchLinearCycleIssues(apiKey, sprint.linearCycleId);
-        return { sprint, issues };
+        if (!sprint.linearCycleId) return { sprint, issues: [], error: null };
+        try {
+          const issues = await fetchLinearCycleIssues(apiKey, sprint.linearCycleId);
+          return { sprint, issues, error: null };
+        } catch (error) {
+          console.error(`Failed to fetch sprint ${sprint.name}:`, error);
+          return { sprint, issues: [], error };
+        }
       });
 
       const backlogPromise = selectedTeamId
-        ? fetchLinearBacklogIssues(apiKey, selectedTeamId)
+        ? fetchLinearBacklogIssues(apiKey, selectedTeamId).catch(error => {
+            console.error('Failed to fetch backlog:', error);
+            return [];
+          })
         : Promise.resolve([]);
 
       const [sprintResults, backlogIssues] = await Promise.all([
@@ -552,9 +574,9 @@ export function LinearSprintSync({
       let totalUpdated = 0;
       let totalRemoved = 0;
 
-      // Process each sprint
-      for (const { sprint, issues } of sprintResults) {
-        if (!sprint.linearCycleId) continue;
+      // Process each sprint (skip failed fetches)
+      for (const { sprint, issues, error } of sprintResults) {
+        if (!sprint.linearCycleId || error) continue;
 
         const linearIssueIdsInCycle = new Set(issues.map(i => i.id));
         const existingTaskLinearIds = new Set(
@@ -604,9 +626,18 @@ export function LinearSprintSync({
           })
           .filter((task): task is SprintTask => task !== null);
 
-        // Add new tasks
+        // Add new tasks - but first check if task with same linearIssueId exists elsewhere
+        // (e.g., in backlog) and remove it to prevent duplicates
         for (const issue of newIssues) {
-          totalNew++;
+          // Remove any existing task with the same linearIssueId (from backlog or other sprint)
+          const existingIndex = finalTasks.findIndex(t => t.linearIssueId === issue.id);
+          if (existingIndex !== -1) {
+            finalTasks.splice(existingIndex, 1);
+            // Don't count as "new" if it was just moved from backlog
+          } else {
+            totalNew++;
+          }
+
           const converted = convertLinearIssueToSprintTask(issue, sprint.id);
           finalTasks.push({
             id: `linear-${issue.id}`,
@@ -686,9 +717,16 @@ export function LinearSprintSync({
           })
           .filter((task): task is SprintTask => task !== null);
 
-        // Add new backlog tasks
+        // Add new backlog tasks - check for duplicates first
         for (const issue of newBacklogIssues) {
-          totalNew++;
+          // Remove any existing task with the same linearIssueId to prevent duplicates
+          const existingIndex = finalTasks.findIndex(t => t.linearIssueId === issue.id);
+          if (existingIndex !== -1) {
+            finalTasks.splice(existingIndex, 1);
+          } else {
+            totalNew++;
+          }
+
           const converted = convertLinearIssueToSprintTask(issue, undefined);
           finalTasks.push({
             id: `linear-${issue.id}`,
@@ -745,7 +783,7 @@ export function LinearSprintSync({
   }, []);
 
   // Track if initial sync has been done to prevent duplicate syncs
-  const [initialSyncDone, setInitialSyncDone] = useState(false);
+  const initialSyncDoneRef = useRef(false);
 
   useEffect(() => {
     // Need either linked sprints OR a selected team (for backlog sync)
@@ -753,8 +791,9 @@ export function LinearSprintSync({
 
     // Delay initial sync to ensure state is fully initialized
     const timeoutId = setTimeout(() => {
-      if (!initialSyncDone && !isSyncing) {
-        setInitialSyncDone(true);
+      // Use refs to get current values (avoid stale closure)
+      if (!initialSyncDoneRef.current && !isSyncingRef.current) {
+        initialSyncDoneRef.current = true;
         // Silent sync on initial load - don't show error toasts for auto-sync failures
         handleSyncAllFromLinear(true).catch(() => {
           // Silently ignore auto-sync errors on initial load
@@ -765,7 +804,8 @@ export function LinearSprintSync({
 
     // Set up polling interval (60 seconds instead of 30 to reduce errors)
     const intervalId = setInterval(() => {
-      if (!isSyncing) {
+      // Use ref to get current syncing state (avoid stale closure)
+      if (!isSyncingRef.current) {
         // Silent sync for polling - don't show error toasts
         handleSyncAllFromLinear(true).catch(() => {
           console.log('Auto-sync polling skipped or failed');

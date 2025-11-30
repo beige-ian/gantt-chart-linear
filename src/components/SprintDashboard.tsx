@@ -103,18 +103,14 @@ export function SprintDashboard() {
     }
   }, []);
 
-  // Save sprints
+  // Save sprints - always save, even if empty (to allow clearing data)
   useEffect(() => {
-    if (sprints.length > 0) {
-      localStorage.setItem('sprints', JSON.stringify(sprints));
-    }
+    localStorage.setItem('sprints', JSON.stringify(sprints));
   }, [sprints]);
 
-  // Save tasks
+  // Save tasks - always save, even if empty (to allow clearing data)
   useEffect(() => {
-    if (sprintTasks.length > 0) {
-      localStorage.setItem('sprint-tasks', JSON.stringify(sprintTasks));
-    }
+    localStorage.setItem('sprint-tasks', JSON.stringify(sprintTasks));
   }, [sprintTasks]);
 
   // Save current sprint selection
@@ -413,9 +409,11 @@ export function SprintDashboard() {
 
   const handleImportTasks = (tasks: Omit<SprintTask, 'id'>[]) => {
     // Use linearIssueId-based ID to avoid duplicates
-    const newTasks = tasks.map((t) => ({
+    // For local tasks, use timestamp + index to ensure unique IDs
+    const baseTimestamp = Date.now();
+    const newTasks = tasks.map((t, index) => ({
       ...t,
-      id: t.linearIssueId ? `linear-${t.linearIssueId}` : Date.now().toString(),
+      id: t.linearIssueId ? `linear-${t.linearIssueId}` : `local-${baseTimestamp}-${index}`,
       sprintId: currentSprintId || t.sprintId,
     }));
 

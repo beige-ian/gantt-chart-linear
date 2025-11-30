@@ -32,6 +32,35 @@ interface SimpleTaskFormProps {
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
 
+// Team colors for generating unique team badges based on teamId
+const TEAM_COLORS = [
+  { bg: 'bg-blue-100 dark:bg-blue-900/40', text: 'text-blue-700 dark:text-blue-300', border: 'border-blue-300 dark:border-blue-700' },
+  { bg: 'bg-emerald-100 dark:bg-emerald-900/40', text: 'text-emerald-700 dark:text-emerald-300', border: 'border-emerald-300 dark:border-emerald-700' },
+  { bg: 'bg-violet-100 dark:bg-violet-900/40', text: 'text-violet-700 dark:text-violet-300', border: 'border-violet-300 dark:border-violet-700' },
+  { bg: 'bg-amber-100 dark:bg-amber-900/40', text: 'text-amber-700 dark:text-amber-300', border: 'border-amber-300 dark:border-amber-700' },
+  { bg: 'bg-rose-100 dark:bg-rose-900/40', text: 'text-rose-700 dark:text-rose-300', border: 'border-rose-300 dark:border-rose-700' },
+  { bg: 'bg-cyan-100 dark:bg-cyan-900/40', text: 'text-cyan-700 dark:text-cyan-300', border: 'border-cyan-300 dark:border-cyan-700' },
+  { bg: 'bg-indigo-100 dark:bg-indigo-900/40', text: 'text-indigo-700 dark:text-indigo-300', border: 'border-indigo-300 dark:border-indigo-700' },
+  { bg: 'bg-pink-100 dark:bg-pink-900/40', text: 'text-pink-700 dark:text-pink-300', border: 'border-pink-300 dark:border-pink-700' },
+];
+
+// Get consistent team color based on teamId hash
+function getTeamColor(teamId: string) {
+  let hash = 0;
+  for (let i = 0; i < teamId.length; i++) {
+    hash = ((hash << 5) - hash) + teamId.charCodeAt(i);
+    hash = hash & hash;
+  }
+  return TEAM_COLORS[Math.abs(hash) % TEAM_COLORS.length];
+}
+
+// Get team initial from team name
+function getTeamInitial(teamName: string): string {
+  if (!teamName) return '?';
+  // Get first letter of first word (uppercase)
+  return teamName.charAt(0).toUpperCase();
+}
+
 const PRIORITY_OPTIONS = [
   { value: 'none', label: '없음', color: 'bg-gray-100 text-gray-600' },
   { value: 'low', label: '낮음', color: 'bg-green-100 text-green-700' },
@@ -2130,25 +2159,28 @@ export function GanttChart({ className }: GanttChartProps) {
                               </span>
                             </div>
                             {/* Second row - Assignee & Meta (only show if there's content) */}
-                            {(task.teamIcon || task.assignee || task.cycleName || (task.labels && task.labels.length > 0)) && (
+                            {(task.teamName || task.assignee || task.cycleName || (task.labels && task.labels.length > 0)) && (
                             <div className="flex items-center gap-1.5 mt-1">
-                              {/* Team Icon - show emoji if valid, otherwise show icon */}
-                              {task.teamName && (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <span className="flex-shrink-0 cursor-default">
-                                      {task.teamIcon && /^\p{Emoji}/u.test(task.teamIcon) ? (
-                                        <span className="text-sm">{task.teamIcon}</span>
-                                      ) : (
-                                        <div className="w-4 h-4 rounded bg-muted flex items-center justify-center">
-                                          <Users className="w-2.5 h-2.5 text-muted-foreground" />
-                                        </div>
-                                      )}
-                                    </span>
-                                  </TooltipTrigger>
-                                  <TooltipContent>{task.teamName}</TooltipContent>
-                                </Tooltip>
-                              )}
+                              {/* Team Icon - show emoji if valid, otherwise show team initial with unique color */}
+                              {task.teamName && (() => {
+                                const teamColor = task.teamId ? getTeamColor(task.teamId) : TEAM_COLORS[0];
+                                return (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="flex-shrink-0 cursor-default">
+                                        {task.teamIcon && /^\p{Emoji}/u.test(task.teamIcon) ? (
+                                          <span className="text-sm">{task.teamIcon}</span>
+                                        ) : (
+                                          <div className={`w-4 h-4 rounded flex items-center justify-center text-[9px] font-bold border ${teamColor.bg} ${teamColor.text} ${teamColor.border}`}>
+                                            {getTeamInitial(task.teamName)}
+                                          </div>
+                                        )}
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>{task.teamName}</TooltipContent>
+                                  </Tooltip>
+                                );
+                              })()}
                               {/* Assignee with Avatar */}
                               {task.assignee && (() => {
                                 const avatarUrl = task.assigneeAvatarUrl || linearTeamMembers.get(task.assignee);

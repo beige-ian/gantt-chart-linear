@@ -279,6 +279,11 @@ function AppContent() {
     setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status } : t));
   }, []);
 
+  // Priority change
+  const handlePriorityChange = useCallback((taskId: string, priority: SprintTask['priority']) => {
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, priority } : t));
+  }, []);
+
   // Export data
   const handleExport = useCallback(() => {
     const data = JSON.stringify(tasks, null, 2);
@@ -446,6 +451,7 @@ function AppContent() {
                 tasks={tasks}
                 onTaskClick={handleSelectTask}
                 onStatusChange={handleStatusChange}
+                onPriorityChange={handlePriorityChange}
                 onDeleteTask={handleDeleteTask}
                 onBulkDelete={(ids) => {
                   setTasks(prev => prev.filter(t => !ids.includes(t.id)));

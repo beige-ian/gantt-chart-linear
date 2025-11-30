@@ -45,7 +45,7 @@ import {
   AlertCircle,
   CheckCircle2,
 } from 'lucide-react';
-import { SprintTask, STATUS_LABELS, PRIORITY_COLORS } from '../types/sprint';
+import { SprintTask, STATUS_LABELS, PRIORITY_COLORS, PRIORITY_LABELS } from '../types/sprint';
 import { cn } from './ui/utils';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from './ui/tooltip';
 import { PriorityBadge } from './ui/status-badge';
@@ -56,6 +56,7 @@ interface BacklogPanelProps {
   onTaskAssignToSprint: (taskId: string, sprintId: string) => void;
   onTaskDropFromSprint?: (taskId: string) => void;
   onStatusChange?: (taskId: string, status: SprintTask['status']) => void;
+  onPriorityChange?: (taskId: string, priority: SprintTask['priority']) => void;
   onDeleteTask?: (taskId: string) => void;
   onBulkDelete?: (taskIds: string[]) => void;
   onBulkStatusChange?: (taskIds: string[], status: SprintTask['status']) => void;
@@ -82,6 +83,7 @@ export function BacklogPanel({
   onTaskAssignToSprint,
   onTaskDropFromSprint,
   onStatusChange,
+  onPriorityChange,
   onDeleteTask,
   onBulkDelete,
   onBulkStatusChange,
@@ -587,8 +589,36 @@ export function BacklogPanel({
                               </div>
                             )}
                           </TableCell>
-                          <TableCell onClick={() => onTaskClick(task)}>
-                            <PriorityBadge priority={task.priority} size="sm" />
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            {onPriorityChange ? (
+                              <Select
+                                value={task.priority}
+                                onValueChange={(value) =>
+                                  onPriorityChange(task.id, value as SprintTask['priority'])
+                                }
+                              >
+                                <SelectTrigger className="h-7 w-auto border-0 bg-transparent hover:bg-accent px-2 -ml-2 text-xs">
+                                  <SelectValue>
+                                    <PriorityBadge priority={task.priority} size="sm" />
+                                  </SelectValue>
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {PRIORITY_ORDER.map((priority) => (
+                                    <SelectItem key={priority} value={priority}>
+                                      <div className="flex items-center gap-2">
+                                        <div
+                                          className="w-2 h-2 rounded-full"
+                                          style={{ backgroundColor: PRIORITY_COLORS[priority] }}
+                                        />
+                                        {PRIORITY_LABELS[priority]}
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <PriorityBadge priority={task.priority} size="sm" />
+                            )}
                           </TableCell>
                           <TableCell onClick={() => onTaskClick(task)}>
                             {task.assignee ? (

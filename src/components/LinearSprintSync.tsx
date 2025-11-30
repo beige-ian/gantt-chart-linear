@@ -304,38 +304,65 @@ export function LinearSprintSync({
         })));
       }
 
-      // Update existing tasks if onUpdateTasks is provided
-      if (onUpdateTasks && existingIssues.length > 0) {
-        const updatedTasks = sprintTasks.map(task => {
-          if (!task.linearIssueId) return task;
+      // Get all Linear issue IDs that should be in this sprint
+      const linearIssueIdsInCycle = new Set(issues.map(i => i.id));
 
-          const linearIssue = existingIssues.find(i => i.id === task.linearIssueId);
-          if (!linearIssue) return task;
+      // Update existing tasks and remove tasks that are no longer in the cycle
+      if (onUpdateTasks) {
+        const updatedTasks = sprintTasks
+          .map(task => {
+            // Keep non-Linear tasks unchanged
+            if (!task.linearIssueId) return task;
 
-          const converted = convertLinearIssueToSprintTask(linearIssue, sprint.id);
-          return {
-            ...task,
-            // Update all fields from Linear
-            name: converted.name,
-            description: converted.description,
-            startDate: converted.startDate,
-            endDate: converted.endDate,
-            status: converted.status,
-            progress: converted.progress,
-            storyPoints: converted.storyPoints,
-            priority: converted.priority,
-            assignee: converted.assignee,
-            labels: converted.labels,
-            stateId: converted.stateId,
-            stateName: converted.stateName,
-            stateType: converted.stateType,
-            linearBlocks: converted.linearBlocks,
-            linearBlockedBy: converted.linearBlockedBy,
-            linearParentIssueId: converted.linearParentIssueId,
-          };
-        });
+            // For tasks in OTHER sprints, keep unchanged
+            if (task.sprintId !== sprint.id) return task;
+
+            // For tasks in THIS sprint:
+            // Remove if not in Linear cycle anymore (return null to filter out)
+            if (!linearIssueIdsInCycle.has(task.linearIssueId)) {
+              return null; // Mark for removal
+            }
+
+            // Update if still in cycle
+            const linearIssue = existingIssues.find(i => i.id === task.linearIssueId);
+            if (!linearIssue) return task;
+
+            const converted = convertLinearIssueToSprintTask(linearIssue, sprint.id);
+            return {
+              ...task,
+              // Update all fields from Linear
+              name: converted.name,
+              description: converted.description,
+              startDate: converted.startDate,
+              endDate: converted.endDate,
+              status: converted.status,
+              progress: converted.progress,
+              storyPoints: converted.storyPoints,
+              priority: converted.priority,
+              assignee: converted.assignee,
+              labels: converted.labels,
+              stateId: converted.stateId,
+              stateName: converted.stateName,
+              stateType: converted.stateType,
+              linearBlocks: converted.linearBlocks,
+              linearBlockedBy: converted.linearBlockedBy,
+              linearParentIssueId: converted.linearParentIssueId,
+            };
+          })
+          .filter((task): task is SprintTask => task !== null); // Remove null (deleted) tasks
+
+        // Count removed tasks
+        const removedCount = sprintTasks.filter(t =>
+          t.sprintId === sprint.id &&
+          t.linearIssueId &&
+          !linearIssueIdsInCycle.has(t.linearIssueId)
+        ).length;
 
         onUpdateTasks(updatedTasks);
+
+        if (removedCount > 0 && !silent) {
+          toast.info(`${removedCount}개 태스크가 Linear에서 제거됨`);
+        }
       }
 
       // Update sprint team info if missing

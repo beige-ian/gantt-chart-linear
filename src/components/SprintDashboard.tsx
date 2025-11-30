@@ -419,18 +419,35 @@ export function SprintDashboard() {
       sprintId: currentSprintId || t.sprintId,
     }));
 
-    // Merge with existing tasks, replacing by linearIssueId
+    // Get set of new Linear issue IDs for the current sprint
+    const newLinearIds = new Set(
+      newTasks.filter(t => t.linearIssueId).map(t => t.linearIssueId)
+    );
+
+    // Merge with existing tasks:
+    // - For tasks in the CURRENT sprint with linearIssueId: only keep if they're in the new batch
+    // - For tasks in OTHER sprints: keep all
+    // - For tasks without linearIssueId (local): keep all
     setSprintTasks(prev => {
-      const existingLinearIds = new Set(
-        newTasks.filter(t => t.linearIssueId).map(t => t.linearIssueId)
+      const filtered = prev.filter(t => {
+        // Keep tasks without linearIssueId (local tasks)
+        if (!t.linearIssueId) return true;
+
+        // Keep tasks from other sprints
+        if (t.sprintId !== currentSprintId) return true;
+
+        // For current sprint tasks with linearIssueId:
+        // Only keep if they're in the new batch (will be replaced by newTasks)
+        // or if they're NOT being replaced (different ID format check)
+        return newLinearIds.has(t.linearIssueId);
+      });
+
+      // Remove tasks that will be replaced by new versions
+      const tasksToKeep = filtered.filter(t =>
+        !t.linearIssueId || !newLinearIds.has(t.linearIssueId)
       );
 
-      // Keep tasks that don't have matching linearIssueId
-      const unchanged = prev.filter(t =>
-        !t.linearIssueId || !existingLinearIds.has(t.linearIssueId)
-      );
-
-      return [...unchanged, ...newTasks];
+      return [...tasksToKeep, ...newTasks];
     });
   };
 
@@ -470,14 +487,11 @@ export function SprintDashboard() {
     ));
   };
 
-  // Linear sync handler - update existing tasks
+  // Linear sync handler - replace all tasks with the new list
+  // This is used by LinearSprintSync which sends the complete filtered task list
   const handleUpdateTasks = (updatedTasks: SprintTask[]) => {
-    setSprintTasks(prev => {
-      const updatedIds = new Set(updatedTasks.map(t => t.id));
-      const unchanged = prev.filter(t => !updatedIds.has(t.id));
-      return [...unchanged, ...updatedTasks];
-    });
-    toast.success('태스크 동기화 완료', { description: `${updatedTasks.length}개 태스크 업데이트됨` });
+    setSprintTasks(updatedTasks);
+    // Don't show toast here - LinearSprintSync shows its own toast
   };
 
   // Data import handlers

@@ -62,11 +62,15 @@ export function LinearSprintSync({
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
 
-  // Load API key from localStorage
+  // Load API key and selected team from localStorage
   useEffect(() => {
     const savedKey = localStorage.getItem('linear-api-key');
+    const savedTeamId = localStorage.getItem('linear-default-team');
     if (savedKey) {
       setApiKey(savedKey);
+    }
+    if (savedTeamId) {
+      setSelectedTeamId(savedTeamId);
     }
   }, []);
 
@@ -395,16 +399,21 @@ export function LinearSprintSync({
     toast.success('Linear 연결 해제됨');
   };
 
+  // Get selected team name
+  const selectedTeamName = teams.find(t => t.id === selectedTeamId)?.name;
+
   return (
     <>
       <Button
         variant="outline"
         size="sm"
-        className={`gap-2 ${linkedSprints.length > 0 ? 'border-blue-300 dark:border-blue-700' : ''}`}
+        className={`gap-2 ${isValidKey && selectedTeamId ? 'border-blue-300 dark:border-blue-700' : ''}`}
         onClick={() => setIsOpen(true)}
       >
         <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
-        <span className="hidden sm:inline">Linear</span>
+        <span className="hidden sm:inline">
+          {isValidKey && selectedTeamName ? selectedTeamName : 'Linear'}
+        </span>
         {linkedSprints.length > 0 && (
           <Badge variant="secondary" className="text-xs px-1.5">
             {linkedSprints.length}
@@ -475,7 +484,10 @@ export function LinearSprintSync({
                   {/* Team Selection */}
                   <div className="space-y-2">
                     <Label>팀 선택</Label>
-                    <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
+                    <Select value={selectedTeamId} onValueChange={(v) => {
+                      setSelectedTeamId(v);
+                      localStorage.setItem('linear-default-team', v);
+                    }}>
                       <SelectTrigger>
                         <SelectValue placeholder="팀을 선택하세요" />
                       </SelectTrigger>

@@ -478,13 +478,14 @@ export async function fetchLinearCycleIssues(
 ): Promise<LinearIssue[]> {
   const query = `{
     cycle(id: "${cycleId}") {
-      issues {
+      issues(first: 250) {
         nodes {
           id
           title
           state {
             id
             name
+            type
           }
           priority
           dueDate
@@ -499,6 +500,11 @@ export async function fetchLinearCycleIssues(
             id
             name
           }
+          team {
+            id
+            name
+            icon
+          }
           assignee {
             id
             name
@@ -512,13 +518,30 @@ export async function fetchLinearCycleIssues(
               color
             }
           }
+          parent {
+            id
+            title
+          }
+          relations {
+            nodes {
+              type
+              relatedIssue {
+                id
+              }
+            }
+          }
         }
       }
     }
   }`;
 
   const data = await linearQuery(apiKey, query);
-  return data.cycle?.issues?.nodes || [];
+  const issues = data.cycle?.issues?.nodes || [];
+  return issues.map((issue: any) => ({
+    ...issue,
+    stateType: issue.state?.type,
+    relations: issue.relations?.nodes || [],
+  }));
 }
 
 export async function fetchLinearData(apiKey: string, teamId?: string): Promise<LinearData> {

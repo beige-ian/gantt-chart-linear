@@ -412,7 +412,7 @@ export function TaskBar({
           }`}
           style={{
             left: '-4px',
-            opacity: isHovered || isResizingLeft ? 1 : 0,
+            opacity: isHovered || isResizingLeft || isResizingRight || isDragging ? 1 : 0,
           }}
           onMouseDown={(e) => { e.stopPropagation(); handleResizeLeftStart(e); }}
           onTouchStart={(e) => { e.stopPropagation(); handleResizeLeftStart(e); }}
@@ -436,7 +436,7 @@ export function TaskBar({
           }`}
           style={{
             right: '-4px',
-            opacity: isHovered || isResizingRight ? 1 : 0,
+            opacity: isHovered || isResizingLeft || isResizingRight || isDragging ? 1 : 0,
           }}
           onMouseDown={(e) => { e.stopPropagation(); handleResizeRightStart(e); }}
           onTouchStart={(e) => { e.stopPropagation(); handleResizeRightStart(e); }}

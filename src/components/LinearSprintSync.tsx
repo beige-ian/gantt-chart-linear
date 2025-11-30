@@ -634,8 +634,9 @@ export function LinearSprintSync({
         }
       }
 
-      // Process backlog
-      if (backlogIssues.length > 0) {
+      // Process backlog - ALWAYS process if we have a team selected (even if backlogIssues is empty)
+      // This ensures tasks that moved from backlog to a cycle get removed from backlog
+      if (selectedTeamId) {
         const linearIssueIdsInBacklog = new Set(backlogIssues.map(i => i.id));
         const existingBacklogLinearIds = new Set(
           finalTasks
@@ -652,6 +653,7 @@ export function LinearSprintSync({
             if (!task.linearIssueId) return task;
             if (task.sprintId) return task; // Keep sprint tasks
 
+            // Remove if no longer in backlog (moved to a cycle or deleted)
             if (!linearIssueIdsInBacklog.has(task.linearIssueId)) {
               totalRemoved++;
               return null;

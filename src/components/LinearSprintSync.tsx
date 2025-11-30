@@ -254,11 +254,11 @@ export function LinearSprintSync({
   const linkedTasks = sprintTasks.filter(t => t.linearIssueId);
 
   // Sync linked sprint from Linear
-  const handleSyncFromLinear = useCallback(async (sprint: Sprint) => {
+  const handleSyncFromLinear = useCallback(async (sprint: Sprint, silent = false) => {
     if (!sprint.linearCycleId || !isValidKey) return;
 
     setIsSyncing(true);
-    setSyncError(null);
+    if (!silent) setSyncError(null);
 
     try {
       // Fetch latest issues from the linked cycle
@@ -352,24 +352,29 @@ export function LinearSprintSync({
       }
 
       setLastSyncTime(new Date());
-      toast.success('Linear에서 동기화 완료', {
-        description: `${newIssues.length}개 새 이슈, ${existingIssues.length}개 업데이트`,
-      });
+      if (!silent) {
+        toast.success('Linear에서 동기화 완료', {
+          description: `${newIssues.length}개 새 이슈, ${existingIssues.length}개 업데이트`,
+        });
+      }
     } catch (error) {
       const errorMessage = getLinearErrorMessage(error);
-      setSyncError(errorMessage);
-      toast.error('동기화 실패', { description: errorMessage });
+      if (!silent) {
+        setSyncError(errorMessage);
+        toast.error('동기화 실패', { description: errorMessage });
+      }
+      console.error('Sync failed:', errorMessage);
     } finally {
       setIsSyncing(false);
     }
   }, [apiKey, isValidKey, sprintTasks, sprints, teams, selectedTeamId, onImportTasks, onUpdateTasks, onUpdateSprints]);
 
   // Sync backlog issues (issues without cycle assignment)
-  const handleSyncBacklogFromLinear = useCallback(async () => {
+  const handleSyncBacklogFromLinear = useCallback(async (silent = false) => {
     if (!isValidKey || !selectedTeamId) return;
 
     setIsSyncing(true);
-    setSyncError(null);
+    if (!silent) setSyncError(null);
 
     try {
       // Fetch backlog issues (not assigned to any cycle)
@@ -449,26 +454,31 @@ export function LinearSprintSync({
         onUpdateTasks(updatedTasks);
       }
 
-      toast.success('백로그 동기화 완료', {
-        description: `${newBacklogIssues.length}개 새 이슈, ${existingBacklogIssues.length}개 업데이트`,
-      });
+      if (!silent) {
+        toast.success('백로그 동기화 완료', {
+          description: `${newBacklogIssues.length}개 새 이슈, ${existingBacklogIssues.length}개 업데이트`,
+        });
+      }
     } catch (error) {
       const errorMessage = getLinearErrorMessage(error);
-      setSyncError(errorMessage);
-      toast.error('백로그 동기화 실패', { description: errorMessage });
+      if (!silent) {
+        setSyncError(errorMessage);
+        toast.error('백로그 동기화 실패', { description: errorMessage });
+      }
+      console.error('Backlog sync failed:', errorMessage);
     } finally {
       setIsSyncing(false);
     }
   }, [apiKey, isValidKey, selectedTeamId, sprintTasks, onImportTasks, onUpdateTasks]);
 
   // Sync all linked sprints AND backlog
-  const handleSyncAllFromLinear = async () => {
+  const handleSyncAllFromLinear = async (silent = false) => {
     // First sync all linked sprints
     for (const sprint of linkedSprints) {
-      await handleSyncFromLinear(sprint);
+      await handleSyncFromLinear(sprint, silent);
     }
     // Then sync backlog issues
-    await handleSyncBacklogFromLinear();
+    await handleSyncBacklogFromLinear(silent);
   };
 
   // Auto-sync polling (every 30 seconds when enabled)
@@ -478,21 +488,39 @@ export function LinearSprintSync({
     setAutoSync(savedAutoSync);
   }, []);
 
+  // Track if initial sync has been done to prevent duplicate syncs
+  const [initialSyncDone, setInitialSyncDone] = useState(false);
+
   useEffect(() => {
     // Need either linked sprints OR a selected team (for backlog sync)
     if (!autoSync || !isValidKey || (linkedSprints.length === 0 && !selectedTeamId)) return;
 
-    // Initial sync on mount
-    handleSyncAllFromLinear();
+    // Delay initial sync to ensure state is fully initialized
+    const timeoutId = setTimeout(() => {
+      if (!initialSyncDone && !isSyncing) {
+        setInitialSyncDone(true);
+        // Silent sync on initial load - don't show error toasts for auto-sync failures
+        handleSyncAllFromLinear(true).catch(() => {
+          // Silently ignore auto-sync errors on initial load
+          console.log('Initial auto-sync skipped or failed');
+        });
+      }
+    }, 2000); // 2 second delay for initial sync
 
-    // Set up polling interval (30 seconds)
+    // Set up polling interval (60 seconds instead of 30 to reduce errors)
     const intervalId = setInterval(() => {
       if (!isSyncing) {
-        handleSyncAllFromLinear();
+        // Silent sync for polling - don't show error toasts
+        handleSyncAllFromLinear(true).catch(() => {
+          console.log('Auto-sync polling skipped or failed');
+        });
       }
-    }, 30000);
+    }, 60000);
 
-    return () => clearInterval(intervalId);
+    return () => {
+      clearTimeout(timeoutId);
+      clearInterval(intervalId);
+    };
   }, [autoSync, isValidKey, linkedSprints.length, selectedTeamId]);
 
   // Push task status changes to Linear

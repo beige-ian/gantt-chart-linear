@@ -286,37 +286,51 @@ export async function fetchLinearTeams(apiKey: string): Promise<LinearTeam[]> {
 }
 
 export async function fetchLinearProjects(apiKey: string, teamId?: string): Promise<LinearProject[]> {
-  // Linear API doesn't support team filter on projects directly
-  // We'll fetch all projects and filter client-side if needed
-  const query = `{
-    projects(first: 100) {
-      nodes {
-        id
-        name
-        description
-        state
-        startDate
-        targetDate
-        teams {
-          nodes {
-            id
+  // Fetch all projects with pagination
+  const allProjects: any[] = [];
+  let hasNextPage = true;
+  let cursor: string | null = null;
+
+  while (hasNextPage) {
+    const afterClause = cursor ? `, after: "${cursor}"` : '';
+    const query = `{
+      projects(first: 100${afterClause}) {
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+        nodes {
+          id
+          name
+          description
+          state
+          startDate
+          targetDate
+          teams {
+            nodes {
+              id
+            }
           }
         }
       }
-    }
-  }`;
+    }`;
 
-  const data = await linearQuery(apiKey, query);
-  let projects = data.projects.nodes;
+    const data = await linearQuery(apiKey, query);
+    const projects = data.projects?.nodes || [];
+    allProjects.push(...projects);
+
+    hasNextPage = data.projects?.pageInfo?.hasNextPage || false;
+    cursor = data.projects?.pageInfo?.endCursor || null;
+  }
 
   // Filter by team if teamId provided
   if (teamId) {
-    projects = projects.filter((p: any) =>
+    return allProjects.filter((p: any) =>
       p.teams?.nodes?.some((t: any) => t.id === teamId)
     );
   }
 
-  return projects;
+  return allProjects;
 }
 
 export async function fetchLinearIssues(
@@ -329,117 +343,153 @@ export async function fetchLinearIssues(
   stateType?: string;
   relations?: Array<{ type: string; relatedIssue: { id: string } }>;
 })[]> {
-  // Fetch issues with parent, state type, and relations
-  const query = `{
-    issues(first: 250) {
-      nodes {
-        id
-        title
-        state {
-          id
-          name
-          type
+  // Fetch all issues with pagination
+  const allIssues: any[] = [];
+  let hasNextPage = true;
+  let cursor: string | null = null;
+
+  // Build filter for API-level filtering (more efficient than client-side)
+  const filterParts: string[] = [];
+  if (teamId) {
+    filterParts.push(`team: { id: { eq: "${teamId}" } }`);
+  }
+  if (cycleId) {
+    filterParts.push(`cycle: { id: { eq: "${cycleId}" } }`);
+  }
+  if (projectId) {
+    filterParts.push(`project: { id: { eq: "${projectId}" } }`);
+  }
+  const filterClause = filterParts.length > 0 ? `, filter: { ${filterParts.join(', ')} }` : '';
+
+  while (hasNextPage) {
+    const afterClause = cursor ? `, after: "${cursor}"` : '';
+    const query = `{
+      issues(first: 100${afterClause}${filterClause}) {
+        pageInfo {
+          hasNextPage
+          endCursor
         }
-        priority
-        dueDate
-        createdAt
-        startedAt
-        estimate
-        project {
-          id
-          name
-        }
-        cycle {
-          id
-          name
-        }
-        team {
-          id
-          name
-          icon
-        }
-        assignee {
-          id
-          name
-          displayName
-          avatarUrl
-        }
-        labels {
-          nodes {
-            id
-            name
-            color
-          }
-        }
-        parent {
+        nodes {
           id
           title
-        }
-        relations {
-          nodes {
+          state {
+            id
+            name
             type
-            relatedIssue {
+          }
+          priority
+          dueDate
+          createdAt
+          startedAt
+          updatedAt
+          estimate
+          project {
+            id
+            name
+          }
+          cycle {
+            id
+            name
+          }
+          team {
+            id
+            name
+            icon
+          }
+          assignee {
+            id
+            name
+            displayName
+            avatarUrl
+          }
+          labels {
+            nodes {
               id
+              name
+              color
+            }
+          }
+          parent {
+            id
+            title
+          }
+          relations {
+            nodes {
+              type
+              relatedIssue {
+                id
+              }
             }
           }
         }
       }
-    }
-  }`;
+    }`;
 
-  const data = await linearQuery(apiKey, query);
-  let issues = data.issues.nodes.map((issue: any) => ({
+    const data = await linearQuery(apiKey, query);
+    const issues = data.issues?.nodes || [];
+    allIssues.push(...issues);
+
+    hasNextPage = data.issues?.pageInfo?.hasNextPage || false;
+    cursor = data.issues?.pageInfo?.endCursor || null;
+  }
+
+  return allIssues.map((issue: any) => ({
     ...issue,
     stateType: issue.state?.type,
     relations: issue.relations?.nodes || [],
   }));
-
-  // Filter client-side
-  if (cycleId) {
-    issues = issues.filter((i: any) => i.cycle?.id === cycleId);
-  } else if (projectId) {
-    issues = issues.filter((i: any) => i.project?.id === projectId);
-  } else if (teamId) {
-    issues = issues.filter((i: any) => i.team?.id === teamId);
-  }
-
-  return issues;
 }
 
-// Fetch Linear Cycles (Sprints) for a team
+// Fetch Linear Cycles (Sprints) for a team - with pagination
 export async function fetchLinearCycles(
   apiKey: string,
   teamId: string
 ): Promise<LinearCycle[]> {
-  // Use cycles query with team filter instead of nested query
-  const query = `{
-    cycles(filter: { team: { id: { eq: "${teamId}" } } }, first: 50) {
-      nodes {
-        id
-        name
-        number
-        description
-        startsAt
-        endsAt
-        completedAt
-        progress
-        scopeHistory
-        completedScopeHistory
-      }
-    }
-  }`;
+  const allCycles: any[] = [];
+  let hasNextPage = true;
+  let cursor: string | null = null;
 
   try {
-    const data = await linearQuery(apiKey, query);
+    while (hasNextPage) {
+      const afterClause = cursor ? `, after: "${cursor}"` : '';
+      const query = `{
+        cycles(filter: { team: { id: { eq: "${teamId}" } } }, first: 50${afterClause}) {
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
+          nodes {
+            id
+            name
+            number
+            description
+            startsAt
+            endsAt
+            completedAt
+            progress
+            scopeHistory
+            completedScopeHistory
+          }
+        }
+      }`;
+
+      const data = await linearQuery(apiKey, query);
+      const cycles = data.cycles?.nodes || [];
+      allCycles.push(...cycles);
+
+      hasNextPage = data.cycles?.pageInfo?.hasNextPage || false;
+      cursor = data.cycles?.pageInfo?.endCursor || null;
+    }
+
     // Map scopeHistory to issueCountScope for compatibility
-    return (data.cycles?.nodes || []).map((cycle: any) => ({
+    return allCycles.map((cycle: any) => ({
       ...cycle,
       issueCountScope: cycle.scopeHistory?.[cycle.scopeHistory.length - 1] || 0,
       completedIssueCountScope: cycle.completedScopeHistory?.[cycle.completedScopeHistory.length - 1] || 0,
     }));
   } catch (error) {
     console.error('fetchLinearCycles error:', error);
-    // Try alternative query format
+    // Try alternative query format (fallback without pagination)
     const altQuery = `{
       team(id: "${teamId}") {
         cycles {
@@ -552,6 +602,97 @@ export async function fetchLinearCycleIssues(
 
     hasNextPage = data.cycle?.issues?.pageInfo?.hasNextPage || false;
     cursor = data.cycle?.issues?.pageInfo?.endCursor || null;
+  }
+
+  return allIssues.map((issue: any) => ({
+    ...issue,
+    stateType: issue.state?.type,
+    relations: issue.relations?.nodes || [],
+  }));
+}
+
+// Fetch backlog issues (not assigned to any cycle) for a team
+export async function fetchLinearBacklogIssues(
+  apiKey: string,
+  teamId: string
+): Promise<LinearIssue[]> {
+  const allIssues: any[] = [];
+  let hasNextPage = true;
+  let cursor: string | null = null;
+
+  while (hasNextPage) {
+    const afterClause = cursor ? `, after: "${cursor}"` : '';
+    const query = `{
+      issues(first: 100${afterClause}, filter: {
+        team: { id: { eq: "${teamId}" } },
+        cycle: { null: true }
+      }) {
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+        nodes {
+          id
+          title
+          state {
+            id
+            name
+            type
+          }
+          priority
+          dueDate
+          createdAt
+          startedAt
+          updatedAt
+          estimate
+          project {
+            id
+            name
+          }
+          cycle {
+            id
+            name
+          }
+          team {
+            id
+            name
+            icon
+          }
+          assignee {
+            id
+            name
+            displayName
+            avatarUrl
+          }
+          labels {
+            nodes {
+              id
+              name
+              color
+            }
+          }
+          parent {
+            id
+            title
+          }
+          relations {
+            nodes {
+              type
+              relatedIssue {
+                id
+              }
+            }
+          }
+        }
+      }
+    }`;
+
+    const data = await linearQuery(apiKey, query);
+    const issues = data.issues?.nodes || [];
+    allIssues.push(...issues);
+
+    hasNextPage = data.issues?.pageInfo?.hasNextPage || false;
+    cursor = data.issues?.pageInfo?.endCursor || null;
   }
 
   return allIssues.map((issue: any) => ({

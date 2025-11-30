@@ -16,6 +16,7 @@ import {
   fetchLinearCycles,
   fetchLinearCycleIssues,
   fetchLinearIssues,
+  fetchLinearBacklogIssues,
   convertLinearIssueToSprintTask,
   convertLinearCycleToSprint,
   updateLinearIssueState,
@@ -332,11 +333,106 @@ export function LinearSprintSync({
     }
   }, [apiKey, isValidKey, sprintTasks, onImportTasks, onUpdateTasks]);
 
-  // Sync all linked sprints
+  // Sync backlog issues (issues without cycle assignment)
+  const handleSyncBacklogFromLinear = useCallback(async () => {
+    if (!isValidKey || !selectedTeamId) return;
+
+    setIsSyncing(true);
+    setSyncError(null);
+
+    try {
+      // Fetch backlog issues (not assigned to any cycle)
+      const backlogIssues = await fetchLinearBacklogIssues(apiKey, selectedTeamId);
+
+      // Get existing backlog task IDs
+      const existingBacklogTaskIds = new Set(
+        sprintTasks
+          .filter(t => !t.sprintId && t.linearIssueId)
+          .map(t => t.linearIssueId)
+      );
+
+      const newBacklogIssues = backlogIssues.filter(i => !existingBacklogTaskIds.has(i.id));
+      const existingBacklogIssues = backlogIssues.filter(i => existingBacklogTaskIds.has(i.id));
+
+      // Import new backlog tasks (without sprintId)
+      if (newBacklogIssues.length > 0) {
+        const newTasks = newBacklogIssues.map(issue =>
+          convertLinearIssueToSprintTask(issue, undefined) // No sprintId = backlog
+        );
+
+        onImportTasks(newTasks.map(t => ({
+          name: t.name,
+          description: t.description,
+          startDate: t.startDate,
+          endDate: t.endDate,
+          progress: t.progress,
+          color: t.color,
+          status: t.status,
+          storyPoints: t.storyPoints,
+          priority: t.priority,
+          assignee: t.assignee,
+          sprintId: undefined, // Backlog - no sprint
+          linearProjectId: t.linearProjectId,
+          linearIssueId: t.linearIssueId,
+          linearParentIssueId: t.linearParentIssueId,
+          labels: t.labels,
+          stateId: t.stateId,
+          stateName: t.stateName,
+          stateType: t.stateType,
+          linearBlocks: t.linearBlocks,
+          linearBlockedBy: t.linearBlockedBy,
+        })));
+      }
+
+      // Update existing backlog tasks
+      if (onUpdateTasks && existingBacklogIssues.length > 0) {
+        const updatedTasks = sprintTasks.map(task => {
+          if (!task.linearIssueId || task.sprintId) return task;
+
+          const linearIssue = existingBacklogIssues.find(i => i.id === task.linearIssueId);
+          if (!linearIssue) return task;
+
+          const converted = convertLinearIssueToSprintTask(linearIssue, undefined);
+          return {
+            ...task,
+            name: converted.name,
+            status: converted.status,
+            progress: converted.progress,
+            storyPoints: converted.storyPoints,
+            assignee: converted.assignee,
+            priority: converted.priority,
+            stateId: converted.stateId,
+            stateName: converted.stateName,
+            stateType: converted.stateType,
+            linearBlocks: converted.linearBlocks,
+            linearBlockedBy: converted.linearBlockedBy,
+            linearParentIssueId: converted.linearParentIssueId,
+          };
+        });
+
+        onUpdateTasks(updatedTasks);
+      }
+
+      toast.success('백로그 동기화 완료', {
+        description: `${newBacklogIssues.length}개 새 이슈, ${existingBacklogIssues.length}개 업데이트`,
+      });
+    } catch (error) {
+      const errorMessage = getLinearErrorMessage(error);
+      setSyncError(errorMessage);
+      toast.error('백로그 동기화 실패', { description: errorMessage });
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [apiKey, isValidKey, selectedTeamId, sprintTasks, onImportTasks, onUpdateTasks]);
+
+  // Sync all linked sprints AND backlog
   const handleSyncAllFromLinear = async () => {
+    // First sync all linked sprints
     for (const sprint of linkedSprints) {
       await handleSyncFromLinear(sprint);
     }
+    // Then sync backlog issues
+    await handleSyncBacklogFromLinear();
   };
 
   // Auto-sync polling (every 30 seconds when enabled)
@@ -347,7 +443,8 @@ export function LinearSprintSync({
   }, []);
 
   useEffect(() => {
-    if (!autoSync || !isValidKey || linkedSprints.length === 0) return;
+    // Need either linked sprints OR a selected team (for backlog sync)
+    if (!autoSync || !isValidKey || (linkedSprints.length === 0 && !selectedTeamId)) return;
 
     // Initial sync on mount
     handleSyncAllFromLinear();
@@ -360,7 +457,7 @@ export function LinearSprintSync({
     }, 30000);
 
     return () => clearInterval(intervalId);
-  }, [autoSync, isValidKey, linkedSprints.length]);
+  }, [autoSync, isValidKey, linkedSprints.length, selectedTeamId]);
 
   // Push task status changes to Linear
   const handlePushToLinear = async (task: SprintTask) => {

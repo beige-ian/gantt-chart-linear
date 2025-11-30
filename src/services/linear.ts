@@ -611,7 +611,7 @@ export async function fetchLinearCycleIssues(
   }));
 }
 
-// Fetch backlog issues (not assigned to any cycle) for a team
+// Fetch backlog issues (not assigned to any cycle, excluding completed) for a team
 export async function fetchLinearBacklogIssues(
   apiKey: string,
   teamId: string
@@ -625,7 +625,8 @@ export async function fetchLinearBacklogIssues(
     const query = `{
       issues(first: 100${afterClause}, filter: {
         team: { id: { eq: "${teamId}" } },
-        cycle: { null: true }
+        cycle: { null: true },
+        state: { type: { neq: "completed" } }
       }) {
         pageInfo {
           hasNextPage

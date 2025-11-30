@@ -21,7 +21,7 @@ import { DataExport } from './DataExport';
 import { DataImport } from './DataImport';
 import { TeamManager, useTeamMembers } from './TeamManager';
 import { DeadlineAlerts } from './DeadlineAlerts';
-import { TaskFilters, TaskFilterOptions, TaskSortOptions, applyTaskFiltersAndSort } from './TaskFilters';
+import { LinearStyleFilters, LinearFilterOptions, LinearSortOptions, applyLinearFiltersAndSort, defaultLinearFilters, defaultLinearSort } from './LinearStyleFilters';
 import {
   findLinearStateForStatus,
   getTeamIdForIssue,
@@ -45,18 +45,9 @@ export function SprintDashboard() {
   const [editingTask, setEditingTask] = useState<SprintTask | null>(null);
   const { members: teamMembers, updateMembers: setTeamMembers } = useTeamMembers();
 
-  // Filter and sort state
-  const [taskFilters, setTaskFilters] = useState<TaskFilterOptions>({
-    search: '',
-    priority: [],
-    assignee: [],
-    hasDeadlineSoon: false,
-    isOverdue: false,
-  });
-  const [taskSort, setTaskSort] = useState<TaskSortOptions>({
-    field: 'priority',
-    direction: 'asc',
-  });
+  // Filter and sort state (Linear-style)
+  const [taskFilters, setTaskFilters] = useState<LinearFilterOptions>(defaultLinearFilters);
+  const [taskSort, setTaskSort] = useState<LinearSortOptions>(defaultLinearSort);
 
   // Load data from localStorage
   useEffect(() => {
@@ -528,10 +519,10 @@ export function SprintDashboard() {
     return Array.from(assignees).sort();
   }, [currentSprint, currentSprintTasks, sprintTasks]);
 
-  // Apply filters and sorting to tasks
+  // Apply filters and sorting to tasks (Linear-style)
   const filteredTasks = useMemo(() => {
     const tasksToFilter = currentSprint ? currentSprintTasks : sprintTasks;
-    return applyTaskFiltersAndSort(tasksToFilter, taskFilters, taskSort);
+    return applyLinearFiltersAndSort(tasksToFilter, taskFilters, taskSort);
   }, [currentSprint, currentSprintTasks, sprintTasks, taskFilters, taskSort]);
 
   // Convert SprintTask to Task for GanttChart
@@ -682,13 +673,14 @@ export function SprintDashboard() {
         </div>
 
         <TabsContent value="board" className="mt-4 space-y-6">
-          {/* Task Filters */}
-          <TaskFilters
+          {/* Linear-style Task Filters */}
+          <LinearStyleFilters
             filters={taskFilters}
             sort={taskSort}
             onFiltersChange={setTaskFilters}
             onSortChange={setTaskSort}
             assignees={uniqueAssignees}
+            showStatusFilter={false}
           />
 
           {/* Sprint Board - Show first for better visibility */}

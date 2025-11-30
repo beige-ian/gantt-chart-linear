@@ -522,14 +522,217 @@ export function LinearSprintSync({
     }
   }, [apiKey, isValidKey, selectedTeamId, sprintTasks, onUpdateTasks]);
 
-  // Sync all linked sprints AND backlog
+  // Sync all linked sprints AND backlog in ONE operation to avoid stale state issues
   const handleSyncAllFromLinear = async (silent = false) => {
-    // First sync all linked sprints
-    for (const sprint of linkedSprints) {
-      await handleSyncFromLinear(sprint, silent);
+    if (!isValidKey || !onUpdateTasks) return;
+
+    setIsSyncing(true);
+    if (!silent) setSyncError(null);
+
+    try {
+      // Step 1: Fetch ALL data in parallel
+      const sprintDataPromises = linkedSprints.map(async (sprint) => {
+        if (!sprint.linearCycleId) return { sprint, issues: [] };
+        const issues = await fetchLinearCycleIssues(apiKey, sprint.linearCycleId);
+        return { sprint, issues };
+      });
+
+      const backlogPromise = selectedTeamId
+        ? fetchLinearBacklogIssues(apiKey, selectedTeamId)
+        : Promise.resolve([]);
+
+      const [sprintResults, backlogIssues] = await Promise.all([
+        Promise.all(sprintDataPromises),
+        backlogPromise,
+      ]);
+
+      // Step 2: Build complete task list from current sprintTasks
+      let finalTasks = [...sprintTasks];
+      let totalNew = 0;
+      let totalUpdated = 0;
+      let totalRemoved = 0;
+
+      // Process each sprint
+      for (const { sprint, issues } of sprintResults) {
+        if (!sprint.linearCycleId) continue;
+
+        const linearIssueIdsInCycle = new Set(issues.map(i => i.id));
+        const existingTaskLinearIds = new Set(
+          finalTasks
+            .filter(t => t.sprintId === sprint.id && t.linearIssueId)
+            .map(t => t.linearIssueId)
+        );
+
+        const newIssues = issues.filter(i => !existingTaskLinearIds.has(i.id));
+        const existingIssues = issues.filter(i => existingTaskLinearIds.has(i.id));
+
+        // Remove tasks no longer in cycle, update existing
+        finalTasks = finalTasks
+          .map(task => {
+            if (!task.linearIssueId) return task;
+            if (task.sprintId !== sprint.id) return task;
+
+            if (!linearIssueIdsInCycle.has(task.linearIssueId)) {
+              totalRemoved++;
+              return null;
+            }
+
+            const linearIssue = existingIssues.find(i => i.id === task.linearIssueId);
+            if (!linearIssue) return task;
+
+            totalUpdated++;
+            const converted = convertLinearIssueToSprintTask(linearIssue, sprint.id);
+            return {
+              ...task,
+              name: converted.name,
+              description: converted.description,
+              startDate: converted.startDate,
+              endDate: converted.endDate,
+              status: converted.status,
+              progress: converted.progress,
+              storyPoints: converted.storyPoints,
+              priority: converted.priority,
+              assignee: converted.assignee,
+              labels: converted.labels,
+              stateId: converted.stateId,
+              stateName: converted.stateName,
+              stateType: converted.stateType,
+              linearBlocks: converted.linearBlocks,
+              linearBlockedBy: converted.linearBlockedBy,
+              linearParentIssueId: converted.linearParentIssueId,
+            };
+          })
+          .filter((task): task is SprintTask => task !== null);
+
+        // Add new tasks
+        for (const issue of newIssues) {
+          totalNew++;
+          const converted = convertLinearIssueToSprintTask(issue, sprint.id);
+          finalTasks.push({
+            id: `linear-${issue.id}`,
+            name: converted.name,
+            description: converted.description,
+            startDate: converted.startDate,
+            endDate: converted.endDate,
+            progress: converted.progress,
+            color: converted.color,
+            status: converted.status,
+            storyPoints: converted.storyPoints,
+            priority: converted.priority,
+            assignee: converted.assignee,
+            sprintId: sprint.id,
+            linearProjectId: converted.linearProjectId,
+            linearIssueId: converted.linearIssueId,
+            linearParentIssueId: converted.linearParentIssueId,
+            labels: converted.labels,
+            stateId: converted.stateId,
+            stateName: converted.stateName,
+            stateType: converted.stateType,
+            linearBlocks: converted.linearBlocks,
+            linearBlockedBy: converted.linearBlockedBy,
+          });
+        }
+      }
+
+      // Process backlog
+      if (backlogIssues.length > 0) {
+        const linearIssueIdsInBacklog = new Set(backlogIssues.map(i => i.id));
+        const existingBacklogLinearIds = new Set(
+          finalTasks
+            .filter(t => !t.sprintId && t.linearIssueId)
+            .map(t => t.linearIssueId)
+        );
+
+        const newBacklogIssues = backlogIssues.filter(i => !existingBacklogLinearIds.has(i.id));
+        const existingBacklogIssues = backlogIssues.filter(i => existingBacklogLinearIds.has(i.id));
+
+        // Update/remove backlog tasks
+        finalTasks = finalTasks
+          .map(task => {
+            if (!task.linearIssueId) return task;
+            if (task.sprintId) return task; // Keep sprint tasks
+
+            if (!linearIssueIdsInBacklog.has(task.linearIssueId)) {
+              totalRemoved++;
+              return null;
+            }
+
+            const linearIssue = existingBacklogIssues.find(i => i.id === task.linearIssueId);
+            if (!linearIssue) return task;
+
+            totalUpdated++;
+            const converted = convertLinearIssueToSprintTask(linearIssue, undefined);
+            return {
+              ...task,
+              name: converted.name,
+              description: converted.description,
+              startDate: converted.startDate,
+              endDate: converted.endDate,
+              status: converted.status,
+              progress: converted.progress,
+              storyPoints: converted.storyPoints,
+              priority: converted.priority,
+              assignee: converted.assignee,
+              labels: converted.labels,
+              stateId: converted.stateId,
+              stateName: converted.stateName,
+              stateType: converted.stateType,
+              linearBlocks: converted.linearBlocks,
+              linearBlockedBy: converted.linearBlockedBy,
+              linearParentIssueId: converted.linearParentIssueId,
+            };
+          })
+          .filter((task): task is SprintTask => task !== null);
+
+        // Add new backlog tasks
+        for (const issue of newBacklogIssues) {
+          totalNew++;
+          const converted = convertLinearIssueToSprintTask(issue, undefined);
+          finalTasks.push({
+            id: `linear-${issue.id}`,
+            name: converted.name,
+            description: converted.description,
+            startDate: converted.startDate,
+            endDate: converted.endDate,
+            progress: converted.progress,
+            color: converted.color,
+            status: converted.status,
+            storyPoints: converted.storyPoints,
+            priority: converted.priority,
+            assignee: converted.assignee,
+            sprintId: undefined,
+            linearProjectId: converted.linearProjectId,
+            linearIssueId: converted.linearIssueId,
+            linearParentIssueId: converted.linearParentIssueId,
+            labels: converted.labels,
+            stateId: converted.stateId,
+            stateName: converted.stateName,
+            stateType: converted.stateType,
+            linearBlocks: converted.linearBlocks,
+            linearBlockedBy: converted.linearBlockedBy,
+          });
+        }
+      }
+
+      // Step 3: Update state ONCE
+      onUpdateTasks(finalTasks);
+      setLastSyncTime(new Date());
+
+      if (!silent) {
+        toast.success('Linear 동기화 완료', {
+          description: `새 이슈 ${totalNew}개, 업데이트 ${totalUpdated}개${totalRemoved > 0 ? `, 제거 ${totalRemoved}개` : ''}`,
+        });
+      }
+    } catch (error) {
+      const errorMessage = getLinearErrorMessage(error);
+      if (!silent) {
+        setSyncError(errorMessage);
+        toast.error('동기화 실패', { description: errorMessage });
+      }
+      console.error('Sync all failed:', errorMessage);
+    } finally {
+      setIsSyncing(false);
     }
-    // Then sync backlog issues
-    await handleSyncBacklogFromLinear(silent);
   };
 
   // Auto-sync polling (every 30 seconds when enabled)

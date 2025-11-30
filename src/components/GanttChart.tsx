@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Calendar, MoreHorizontal, ChevronDown, ChevronRight, Edit3, Check, X, Loader2, ZoomIn, ZoomOut, Home, Search, Filter, BarChart3, Undo2, Redo2, Plus, Copy, Layers, GripVertical, Users } from 'lucide-react';
+import { Calendar, MoreHorizontal, ChevronDown, ChevronRight, Edit3, Check, X, Loader2, ZoomIn, ZoomOut, Home, Search, Filter, BarChart3, Undo2, Redo2, Plus, Copy, Layers, GripVertical, Users, ChevronsDownUp, ChevronsUpDown } from 'lucide-react';
 import { useUndoRedo } from '../hooks/useUndoRedo';
 import { TaskBar } from './TaskBar';
 import { TaskForm } from './TaskForm';
@@ -132,6 +132,8 @@ function SimpleTaskForm({ task, parentTask, allTasks, onSubmit, onCancel }: Simp
   );
 
   // Linear data
+  const [allTeams, setAllTeams] = useState<{ id: string; name: string; icon?: string }[]>([]);
+  const [selectedTeamId, setSelectedTeamId] = useState<string>(task?.teamId || '');
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [labels, setLabels] = useState<LinearLabel[]>([]);
   const [cycles, setCycles] = useState<LinearCycle[]>([]);
@@ -141,35 +143,49 @@ function SimpleTaskForm({ task, parentTask, allTasks, onSubmit, onCancel }: Simp
   // Get top-level tasks (potential parents = projects)
   const topLevelTasks = allTasks.filter(t => !t.parentId && t.id !== task?.id);
 
-  // Fetch team members and labels on mount
+  // Fetch teams on mount
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchTeams = async () => {
       const apiKey = localStorage.getItem('linear-api-key');
-      let teamId = localStorage.getItem('linear-selected-team-id');
-
       if (!apiKey) return;
+
+      try {
+        const teams = await fetchLinearTeams(apiKey);
+        setAllTeams(teams.map(t => ({ id: t.id, name: t.name, icon: t.icon })));
+
+        // Set default team
+        const savedTeamId = localStorage.getItem('linear-selected-team-id');
+        const defaultTeamId = task?.teamId || savedTeamId || (teams.length > 0 ? teams[0].id : '');
+        if (defaultTeamId) {
+          setSelectedTeamId(defaultTeamId);
+        }
+      } catch (error) {
+        console.error('Failed to fetch teams:', error);
+      }
+    };
+
+    fetchTeams();
+  }, [task?.teamId]);
+
+  // Fetch team members, labels, and cycles when team changes
+  useEffect(() => {
+    const fetchTeamData = async () => {
+      const apiKey = localStorage.getItem('linear-api-key');
+      if (!apiKey || !selectedTeamId) return;
 
       setIsLoadingData(true);
       try {
-        // If no team selected, fetch first team
-        if (!teamId) {
-          const teams = await fetchLinearTeams(apiKey);
-          if (teams.length > 0) {
-            teamId = teams[0].id;
-            localStorage.setItem('linear-selected-team-id', teamId);
-          }
-        }
+        const [members, labelList, cycleList] = await Promise.all([
+          fetchLinearTeamMembers(apiKey, selectedTeamId),
+          fetchLinearLabels(apiKey, selectedTeamId),
+          fetchLinearCycles(apiKey, selectedTeamId),
+        ]);
+        setTeamMembers(members);
+        setLabels(labelList);
+        setCycles(cycleList);
 
-        if (teamId) {
-          const [members, labelList, cycleList] = await Promise.all([
-            fetchLinearTeamMembers(apiKey, teamId),
-            fetchLinearLabels(apiKey, teamId),
-            fetchLinearCycles(apiKey, teamId),
-          ]);
-          setTeamMembers(members);
-          setLabels(labelList);
-          setCycles(cycleList);
-        }
+        // Save selected team to localStorage
+        localStorage.setItem('linear-selected-team-id', selectedTeamId);
       } catch (error) {
         console.error('Failed to fetch Linear data:', error);
       } finally {
@@ -177,8 +193,8 @@ function SimpleTaskForm({ task, parentTask, allTasks, onSubmit, onCancel }: Simp
       }
     };
 
-    fetchData();
-  }, []);
+    fetchTeamData();
+  }, [selectedTeamId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -191,18 +207,9 @@ function SimpleTaskForm({ task, parentTask, allTasks, onSubmit, onCancel }: Simp
 
     try {
       const apiKey = localStorage.getItem('linear-api-key');
-      let teamId = localStorage.getItem('linear-selected-team-id');
+      const teamId = selectedTeamId || localStorage.getItem('linear-selected-team-id');
       let linearProjectId: string | undefined;
       let linearIssueId: string | undefined;
-
-      // If no team selected, fetch first team
-      if (apiKey && !teamId) {
-        const teams = await fetchLinearTeams(apiKey);
-        if (teams.length > 0) {
-          teamId = teams[0].id;
-          localStorage.setItem('linear-selected-team-id', teamId);
-        }
-      }
 
       if (apiKey && teamId) {
         if (task) {
@@ -304,6 +311,9 @@ function SimpleTaskForm({ task, parentTask, allTasks, onSubmit, onCancel }: Simp
       const selectedCycle = cycles.find(c => c.id === selectedCycleId);
       const cycleName = selectedCycle?.name || `Cycle ${selectedCycle?.number}`;
 
+      // Get team info for local display
+      const selectedTeam = allTeams.find(t => t.id === selectedTeamId);
+
       onSubmit({
         name: name.trim(),
         description: description.trim() || undefined,
@@ -324,6 +334,9 @@ function SimpleTaskForm({ task, parentTask, allTasks, onSubmit, onCancel }: Simp
         estimate: estimate ? parseInt(estimate, 10) : task?.estimate,
         cycleId: selectedCycleId && selectedCycleId !== '__none__' ? selectedCycleId : undefined,
         cycleName: selectedCycleId && selectedCycleId !== '__none__' ? cycleName : undefined,
+        teamId: selectedTeamId || task?.teamId,
+        teamName: selectedTeam?.name || task?.teamName,
+        teamIcon: selectedTeam?.icon || task?.teamIcon,
       });
     } catch (error) {
       console.error('Error:', error);
@@ -454,22 +467,44 @@ function SimpleTaskForm({ task, parentTask, allTasks, onSubmit, onCancel }: Simp
             </div>
           </div>
 
-          {/* Assignee */}
-          <div className="space-y-2">
-            <Label>담당자</Label>
-            <Select value={assigneeId || '__unassigned__'} onValueChange={(v) => setAssigneeId(v === '__unassigned__' ? '' : v)}>
-              <SelectTrigger>
-                <SelectValue placeholder="담당자 선택" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__unassigned__">미지정</SelectItem>
-                {teamMembers.map((member) => (
-                  <SelectItem key={member.id} value={member.id}>
-                    {member.displayName || member.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {/* Team & Assignee */}
+          <div className="grid grid-cols-2 gap-4">
+            {/* Team */}
+            {allTeams.length > 0 && (
+              <div className="space-y-2">
+                <Label>팀</Label>
+                <Select value={selectedTeamId || '__none__'} onValueChange={(v) => setSelectedTeamId(v === '__none__' ? '' : v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="팀 선택" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allTeams.map((team) => (
+                      <SelectItem key={team.id} value={team.id}>
+                        {team.icon ? `${team.icon} ` : ''}{team.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Assignee */}
+            <div className="space-y-2">
+              <Label>담당자</Label>
+              <Select value={assigneeId || '__unassigned__'} onValueChange={(v) => setAssigneeId(v === '__unassigned__' ? '' : v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="담당자 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__unassigned__">미지정</SelectItem>
+                  {teamMembers.map((member) => (
+                    <SelectItem key={member.id} value={member.id}>
+                      {member.displayName || member.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {/* Labels */}
@@ -878,6 +913,15 @@ export function GanttChart({ className }: GanttChartProps) {
       newCollapsed.add(taskId);
     }
     setCollapsedTasks(newCollapsed);
+  };
+
+  const expandAllTasks = (): void => {
+    setCollapsedTasks(new Set());
+  };
+
+  const collapseAllTasks = (): void => {
+    const tasksWithChildren = tasks.filter(t => hasChildren(t.id)).map(t => t.id);
+    setCollapsedTasks(new Set(tasksWithChildren));
   };
 
   // Get unique assignees from tasks
@@ -1721,6 +1765,37 @@ export function GanttChart({ className }: GanttChartProps) {
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" className="text-xs">다시 실행 (⌘⇧Z)</TooltipContent>
+                </Tooltip>
+              </div>
+
+              {/* Expand/Collapse All Controls */}
+              <div className="flex items-center bg-muted/30 rounded-md p-0.5">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 hover:bg-background"
+                      onClick={expandAllTasks}
+                    >
+                      <ChevronsUpDown className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-xs">전체 펼치기</TooltipContent>
+                </Tooltip>
+                <div className="w-px h-4 bg-border/50" />
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 hover:bg-background"
+                      onClick={collapseAllTasks}
+                    >
+                      <ChevronsDownUp className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-xs">전체 접기</TooltipContent>
                 </Tooltip>
               </div>
 

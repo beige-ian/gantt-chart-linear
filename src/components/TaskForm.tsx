@@ -8,7 +8,19 @@ import { Switch } from './ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Checkbox } from './ui/checkbox';
 import { Trash2, Flag, Link2 } from 'lucide-react';
-import { Task } from './GanttChart';
+import { Task, LinearCycleInfo } from './GanttChart';
+
+interface AssigneeOption {
+  id: string;
+  name: string;
+  avatarUrl?: string;
+}
+
+interface TeamOption {
+  id: string;
+  name: string;
+  icon?: string;
+}
 
 interface TaskFormProps {
   task?: Task | null;
@@ -17,6 +29,9 @@ interface TaskFormProps {
   onSubmit: (taskData: Omit<Task, 'id'>) => void;
   onDelete?: () => void;
   onCancel: () => void;
+  assignees?: AssigneeOption[];
+  teams?: TeamOption[];
+  cycles?: LinearCycleInfo[];
 }
 
 const predefinedColors = [
@@ -30,7 +45,7 @@ const predefinedColors = [
   '#84cc16', // lime
 ];
 
-export function TaskForm({ task, tasks, parentTaskId, onSubmit, onDelete, onCancel }: TaskFormProps) {
+export function TaskForm({ task, tasks, parentTaskId, onSubmit, onDelete, onCancel, assignees = [], teams = [], cycles = [] }: TaskFormProps) {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -41,6 +56,12 @@ export function TaskForm({ task, tasks, parentTaskId, onSubmit, onDelete, onCanc
     parentId: '',
     isMilestone: false,
     dependencies: [] as string[],
+    assigneeId: '',
+    assignee: '',
+    teamId: '',
+    teamName: '',
+    cycleId: '',
+    cycleName: '',
   });
 
   // Get potential parent tasks (exclude current task and its descendants if editing)
@@ -92,6 +113,12 @@ export function TaskForm({ task, tasks, parentTaskId, onSubmit, onDelete, onCanc
         parentId: task.parentId || '',
         isMilestone: task.isMilestone || false,
         dependencies: task.dependencies || [],
+        assigneeId: task.assigneeId || '',
+        assignee: task.assignee || '',
+        teamId: task.teamId || '',
+        teamName: task.teamName || '',
+        cycleId: task.cycleId || '',
+        cycleName: task.cycleName || '',
       });
     } else {
       // Set default dates for new tasks
@@ -123,6 +150,12 @@ export function TaskForm({ task, tasks, parentTaskId, onSubmit, onDelete, onCanc
         parentId: parentTaskId || '',
         isMilestone: false,
         dependencies: [],
+        assigneeId: '',
+        assignee: '',
+        teamId: '',
+        teamName: '',
+        cycleId: '',
+        cycleName: '',
       });
     }
   }, [task, parentTaskId, tasks]);
@@ -168,6 +201,12 @@ export function TaskForm({ task, tasks, parentTaskId, onSubmit, onDelete, onCanc
       parentId: formData.parentId || undefined,
       isMilestone: formData.isMilestone || undefined,
       dependencies: formData.dependencies.length > 0 ? formData.dependencies : undefined,
+      assigneeId: formData.assigneeId || undefined,
+      assignee: formData.assignee || undefined,
+      teamId: formData.teamId || undefined,
+      teamName: formData.teamName || undefined,
+      cycleId: formData.cycleId || undefined,
+      cycleName: formData.cycleName || undefined,
     });
   };
 
@@ -223,6 +262,101 @@ export function TaskForm({ task, tasks, parentTaskId, onSubmit, onDelete, onCanc
           className="text-[15px] min-h-[80px]"
         />
       </div>
+
+      {/* Assignee, Team, Sprint Selection - Only show for subtasks (issues) */}
+      {(parentTaskId || formData.parentId) && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Assignee Selection */}
+          {assignees.length > 0 && (
+            <div className="space-y-2.5">
+              <Label className="text-[15px] font-semibold">담당자</Label>
+              <Select
+                value={formData.assigneeId}
+                onValueChange={(value) => {
+                  const selected = assignees.find(a => a.id === value);
+                  setFormData({
+                    ...formData,
+                    assigneeId: value,
+                    assignee: selected?.name || ''
+                  });
+                }}
+              >
+                <SelectTrigger className="h-11 text-[15px]">
+                  <SelectValue placeholder="담당자 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="" className="text-[15px]">미지정</SelectItem>
+                  {assignees.map((assignee) => (
+                    <SelectItem key={assignee.id} value={assignee.id} className="text-[15px]">
+                      {assignee.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Team Selection */}
+          {teams.length > 0 && (
+            <div className="space-y-2.5">
+              <Label className="text-[15px] font-semibold">팀</Label>
+              <Select
+                value={formData.teamId}
+                onValueChange={(value) => {
+                  const selected = teams.find(t => t.id === value);
+                  setFormData({
+                    ...formData,
+                    teamId: value,
+                    teamName: selected?.name || ''
+                  });
+                }}
+              >
+                <SelectTrigger className="h-11 text-[15px]">
+                  <SelectValue placeholder="팀 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="" className="text-[15px]">미지정</SelectItem>
+                  {teams.map((team) => (
+                    <SelectItem key={team.id} value={team.id} className="text-[15px]">
+                      {team.icon ? `${team.icon} ` : ''}{team.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Sprint/Cycle Selection */}
+          {cycles.length > 0 && (
+            <div className="space-y-2.5">
+              <Label className="text-[15px] font-semibold">스프린트</Label>
+              <Select
+                value={formData.cycleId}
+                onValueChange={(value) => {
+                  const selected = cycles.find(c => c.id === value);
+                  setFormData({
+                    ...formData,
+                    cycleId: value,
+                    cycleName: selected?.name || ''
+                  });
+                }}
+              >
+                <SelectTrigger className="h-11 text-[15px]">
+                  <SelectValue placeholder="스프린트 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="" className="text-[15px]">미지정</SelectItem>
+                  {cycles.map((cycle) => (
+                    <SelectItem key={cycle.id} value={cycle.id} className="text-[15px]">
+                      {cycle.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Parent Task Selection */}
       {!parentTaskId && potentialParents.length > 0 && !formData.isMilestone && (

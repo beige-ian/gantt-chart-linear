@@ -374,21 +374,52 @@ export function SprintDashboard() {
 
   // Linear import handlers
   const handleImportSprint = (sprintData: Omit<Sprint, 'id'>) => {
+    // Use linearCycleId as the sprint ID to avoid duplicates
+    const sprintId = sprintData.linearCycleId
+      ? `linear-cycle-${sprintData.linearCycleId}`
+      : Date.now().toString();
+
+    // Check if sprint already exists
+    const existingIndex = sprints.findIndex(s =>
+      s.linearCycleId && s.linearCycleId === sprintData.linearCycleId
+    );
+
     const newSprint: Sprint = {
       ...sprintData,
-      id: Date.now().toString(),
+      id: sprintId,
     };
-    setSprints([...sprints, newSprint]);
-    setCurrentSprintId(newSprint.id);
+
+    if (existingIndex >= 0) {
+      // Update existing sprint
+      setSprints(sprints.map((s, i) => i === existingIndex ? newSprint : s));
+    } else {
+      // Add new sprint
+      setSprints([...sprints, newSprint]);
+    }
+    setCurrentSprintId(sprintId);
   };
 
   const handleImportTasks = (tasks: Omit<SprintTask, 'id'>[]) => {
-    const newTasks = tasks.map((t, i) => ({
+    // Use linearIssueId-based ID to avoid duplicates
+    const newTasks = tasks.map((t) => ({
       ...t,
-      id: (Date.now() + i).toString(),
+      id: t.linearIssueId ? `linear-${t.linearIssueId}` : Date.now().toString(),
       sprintId: currentSprintId || t.sprintId,
     }));
-    setSprintTasks([...sprintTasks, ...newTasks]);
+
+    // Merge with existing tasks, replacing by linearIssueId
+    setSprintTasks(prev => {
+      const existingLinearIds = new Set(
+        newTasks.filter(t => t.linearIssueId).map(t => t.linearIssueId)
+      );
+
+      // Keep tasks that don't have matching linearIssueId
+      const unchanged = prev.filter(t =>
+        !t.linearIssueId || !existingLinearIds.has(t.linearIssueId)
+      );
+
+      return [...unchanged, ...newTasks];
+    });
   };
 
   // Assign task to sprint

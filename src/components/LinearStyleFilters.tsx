@@ -223,7 +223,7 @@ export function LinearStyleFilters({
               variant={filters.search ? 'secondary' : 'ghost'}
               size="sm"
               className={cn(
-                'h-7 gap-1.5 text-xs font-normal',
+                'h-7 gap-1 text-xs font-normal',
                 filters.search && 'bg-accent'
               )}
             >

@@ -348,7 +348,7 @@ export function SprintBoard({ tasks, onTaskClick, onStatusChange, onDeleteTask, 
         )}
 
         {/* Kanban Board */}
-        <div className="grid grid-cols-4 gap-4">
+        <div className="flex gap-4 overflow-x-auto pb-2">
           {COLUMNS.map(status => {
             const stats = getColumnStats(status);
             const columnTasks = getTasksByStatus(status);
@@ -358,7 +358,7 @@ export function SprintBoard({ tasks, onTaskClick, onStatusChange, onDeleteTask, 
               <div
                 key={status}
                 data-column={status}
-                className="min-w-0"
+                className="flex-1 min-w-[240px]"
                 onDragOver={(e) => handleDragOver(e, status)}
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, status)}

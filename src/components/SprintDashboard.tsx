@@ -61,6 +61,8 @@ export function SprintDashboard() {
   // Load data from localStorage
   useEffect(() => {
     const savedSprints = localStorage.getItem('sprints');
+    const savedCurrentSprintId = localStorage.getItem('current-sprint-id');
+
     if (savedSprints) {
       try {
         const parsed = JSON.parse(savedSprints);
@@ -71,11 +73,15 @@ export function SprintDashboard() {
         }));
         setSprints(sprintsWithDates);
 
-        // Set current sprint to active or first planning
-        const active = sprintsWithDates.find((s: Sprint) => s.status === 'active');
-        const planning = sprintsWithDates.find((s: Sprint) => s.status === 'planning');
-        if (active) setCurrentSprintId(active.id);
-        else if (planning) setCurrentSprintId(planning.id);
+        // Restore saved sprint selection, or auto-select active/planning
+        if (savedCurrentSprintId && sprintsWithDates.some((s: Sprint) => s.id === savedCurrentSprintId)) {
+          setCurrentSprintId(savedCurrentSprintId);
+        } else {
+          const active = sprintsWithDates.find((s: Sprint) => s.status === 'active');
+          const planning = sprintsWithDates.find((s: Sprint) => s.status === 'planning');
+          if (active) setCurrentSprintId(active.id);
+          else if (planning) setCurrentSprintId(planning.id);
+        }
       } catch (e) {
         console.error('Failed to load sprints:', e);
       }
@@ -110,6 +116,13 @@ export function SprintDashboard() {
       localStorage.setItem('sprint-tasks', JSON.stringify(sprintTasks));
     }
   }, [sprintTasks]);
+
+  // Save current sprint selection
+  useEffect(() => {
+    if (currentSprintId) {
+      localStorage.setItem('current-sprint-id', currentSprintId);
+    }
+  }, [currentSprintId]);
 
   // Sprint handlers
   const handleCreateSprint = (sprintData: Omit<Sprint, 'id'>) => {

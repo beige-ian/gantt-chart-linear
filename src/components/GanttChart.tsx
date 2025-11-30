@@ -2014,7 +2014,7 @@ export function GanttChart({ className }: GanttChartProps) {
 
           {/* Gantt Chart */}
           {tasks.length > 0 && (
-            <div ref={scrollContainerRef} className="overflow-x-auto -mx-4 md:mx-0 rounded-xl border border-border/50 shadow-sm smooth-scroll">
+            <div ref={scrollContainerRef} className="overflow-auto -mx-4 md:mx-0 rounded-xl border border-border/50 shadow-sm smooth-scroll max-h-[calc(100vh-280px)]">
               <div className="min-w-[800px] md:min-w-[1200px] px-4 md:px-0">
                 {/* Timeline Header - Professional Design */}
                 <div className="flex border-b-2 border-border/70 sticky top-0 z-30 bg-gradient-to-b from-muted/60 to-muted/40 backdrop-blur-md relative">

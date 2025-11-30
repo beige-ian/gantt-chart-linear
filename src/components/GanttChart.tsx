@@ -20,6 +20,7 @@ import { GanttSkeleton } from './GanttSkeleton';
 import { ConfirmDialog } from './ConfirmDialog';
 import { ExportMenu } from './ExportMenu';
 import { GanttFilters, GanttStatusFilter, GanttGroupBy } from './GanttFilters';
+import { LinearSync } from './LinearSync';
 
 // Simple Task Form Component
 interface SimpleTaskFormProps {
@@ -1726,6 +1727,12 @@ export function GanttChart({ className }: GanttChartProps) {
               <GanttSettings settings={ganttSettings} onSettingsChange={setGanttSettings} />
 
               <ExportMenu tasks={tasks} projectName="간트 차트" />
+
+              {/* Linear Sync */}
+              <LinearSync
+                onImport={handleLinearImport}
+                importedProjectIds={importedProjectIds}
+              />
 
               {/* Add Task Button */}
               <Button onClick={openAddDialog} size="sm" className="gap-2">

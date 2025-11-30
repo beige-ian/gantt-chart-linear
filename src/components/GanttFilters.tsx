@@ -35,6 +35,7 @@ import {
   SignalZero,
   Zap,
   User,
+  Users,
   Layers,
   BarChart3,
   CircleDashed,
@@ -53,11 +54,14 @@ interface GanttFiltersProps {
   onAssigneeChange: (assignee: string) => void;
   filterPriority: string;
   onPriorityChange: (priority: string) => void;
+  filterTeam: string;
+  onTeamChange: (team: string) => void;
   groupBy: GanttGroupBy;
   onGroupByChange: (groupBy: GanttGroupBy) => void;
   showStats: boolean;
   onShowStatsChange: (show: boolean) => void;
   assignees: string[];
+  teams: string[];
   className?: string;
 }
 
@@ -97,26 +101,31 @@ export function GanttFilters({
   onAssigneeChange,
   filterPriority,
   onPriorityChange,
+  filterTeam,
+  onTeamChange,
   groupBy,
   onGroupByChange,
   showStats,
   onShowStatsChange,
   assignees,
+  teams,
   className,
 }: GanttFiltersProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [assigneeOpen, setAssigneeOpen] = useState(false);
+  const [teamOpen, setTeamOpen] = useState(false);
 
   // Check if any filters are active
   const hasActiveFilters = useMemo(() => {
-    return searchQuery || filterStatus !== 'all' || filterAssignee !== 'all' || filterPriority !== 'all';
-  }, [searchQuery, filterStatus, filterAssignee, filterPriority]);
+    return searchQuery || filterStatus !== 'all' || filterAssignee !== 'all' || filterPriority !== 'all' || filterTeam !== 'all';
+  }, [searchQuery, filterStatus, filterAssignee, filterPriority, filterTeam]);
 
   const clearAllFilters = () => {
     onSearchChange('');
     onStatusChange('all');
     onAssigneeChange('all');
     onPriorityChange('all');
+    onTeamChange('all');
   };
 
   return (
@@ -302,6 +311,66 @@ export function GanttFilters({
           </Popover>
         )}
 
+        {/* Team Filter */}
+        {teams.length > 0 && (
+          <Popover open={teamOpen} onOpenChange={setTeamOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant={filterTeam !== 'all' ? 'secondary' : 'ghost'}
+                size="sm"
+                className={cn(
+                  'h-7 gap-1 text-xs font-normal',
+                  filterTeam !== 'all' && 'bg-accent'
+                )}
+              >
+                <Users className="h-3.5 w-3.5" />
+                {filterTeam === 'all' ? '팀' : (
+                  <span className="max-w-[60px] truncate">{filterTeam}</span>
+                )}
+                <ChevronDown className="h-3 w-3 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-52 p-0" align="start">
+              <Command>
+                <CommandInput placeholder="팀 검색..." className="h-8 text-xs" />
+                <CommandList>
+                  <CommandEmpty className="py-2 text-xs text-center">
+                    결과 없음
+                  </CommandEmpty>
+                  <CommandGroup>
+                    <CommandItem
+                      onSelect={() => {
+                        onTeamChange('all');
+                        setTeamOpen(false);
+                      }}
+                      className={cn('gap-2 text-xs', filterTeam === 'all' && 'bg-accent')}
+                    >
+                      <Users className="h-3.5 w-3.5" />
+                      <span>전체 팀</span>
+                    </CommandItem>
+                    <DropdownMenuSeparator />
+                    {teams.map((team) => (
+                      <CommandItem
+                        key={team}
+                        onSelect={() => {
+                          onTeamChange(team);
+                          setTeamOpen(false);
+                        }}
+                        className={cn('gap-2 text-xs', filterTeam === team && 'bg-accent')}
+                      >
+                        <div className="h-5 w-5 rounded bg-primary/10 flex items-center justify-center text-[10px] font-bold">
+                          {team.charAt(0).toUpperCase()}
+                        </div>
+                        <span className="truncate">{team}</span>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        )}
+
         {/* Divider */}
         <div className="h-3.5 w-px bg-border/50 mx-1" />
 
@@ -410,6 +479,17 @@ export function GanttFilters({
             >
               <User className="h-2.5 w-2.5" />
               {filterAssignee === 'unassigned' ? '미지정' : filterAssignee}
+              <X className="h-2.5 w-2.5" />
+            </Badge>
+          )}
+          {filterTeam !== 'all' && (
+            <Badge
+              variant="secondary"
+              className="h-5 gap-0.5 pl-1.5 pr-0.5 text-[11px] font-normal cursor-pointer hover:bg-accent/80"
+              onClick={() => onTeamChange('all')}
+            >
+              <Users className="h-2.5 w-2.5" />
+              {filterTeam}
               <X className="h-2.5 w-2.5" />
             </Badge>
           )}

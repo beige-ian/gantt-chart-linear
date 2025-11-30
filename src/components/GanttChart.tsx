@@ -61,6 +61,14 @@ function getTeamInitial(teamName: string): string {
   return teamName.charAt(0).toUpperCase();
 }
 
+// Check if string is a valid emoji (not just \p{Emoji} which includes digits)
+function isValidEmoji(str: string): boolean {
+  if (!str) return false;
+  // Check for actual emoji characters (excluding digits and basic ASCII)
+  const emojiRegex = /^[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F000}-\u{1F02F}\u{1F0A0}-\u{1F0FF}]/u;
+  return emojiRegex.test(str);
+}
+
 const PRIORITY_OPTIONS = [
   { value: 'none', label: '없음', color: 'bg-gray-100 text-gray-600' },
   { value: 'low', label: '낮음', color: 'bg-green-100 text-green-700' },
@@ -650,6 +658,7 @@ export function GanttChart({ className }: GanttChartProps) {
   const [filterStatus, setFilterStatus] = useState<GanttStatusFilter>('all');
   const [filterAssignee, setFilterAssignee] = useState<string>('all');
   const [filterPriority, setFilterPriority] = useState<string>('all');
+  const [filterTeam, setFilterTeam] = useState<string>('all');
   const [groupBy, setGroupBy] = useState<GanttGroupBy>('none');
   const [showStats, setShowStats] = useState(false);
   const [ganttSettings, setGanttSettings] = useState<GanttSettingsData>(defaultSettings);
@@ -879,6 +888,15 @@ export function GanttChart({ className }: GanttChartProps) {
     return Array.from(assignees).sort();
   }, [tasks]);
 
+  // Get unique teams from tasks
+  const uniqueTeams = useMemo(() => {
+    const teams = new Set<string>();
+    tasks.forEach(task => {
+      if (task.teamName) teams.add(task.teamName);
+    });
+    return Array.from(teams).sort();
+  }, [tasks]);
+
   // Helper: Check if task matches filters (excluding parent consideration)
   const taskMatchesFilters = useCallback((task: Task): boolean => {
     // Search filter
@@ -899,8 +917,10 @@ export function GanttChart({ className }: GanttChartProps) {
     }
     // Priority filter - only apply to tasks with parentId (issues)
     if (filterPriority !== 'all' && task.parentId && task.priority !== filterPriority) return false;
+    // Team filter - only apply to tasks with parentId (issues)
+    if (filterTeam !== 'all' && task.parentId && task.teamName !== filterTeam) return false;
     return true;
-  }, [searchQuery, filterStatus, filterAssignee, filterPriority]);
+  }, [searchQuery, filterStatus, filterAssignee, filterPriority, filterTeam]);
 
   // Filter tasks based on search and filters
   // Include parent tasks if any of their children match
@@ -916,8 +936,8 @@ export function GanttChart({ className }: GanttChartProps) {
     // Second pass: include parent tasks if they have matching children
     const result = new Set<string>(directMatches);
 
-    // For assignee/priority filters, include projects that have matching children
-    if (filterAssignee !== 'all' || filterPriority !== 'all') {
+    // For assignee/priority/team filters, include projects that have matching children
+    if (filterAssignee !== 'all' || filterPriority !== 'all' || filterTeam !== 'all') {
       tasks.forEach(task => {
         if (!task.parentId) {
           // This is a project - check if any children match
@@ -926,8 +946,8 @@ export function GanttChart({ className }: GanttChartProps) {
           );
           if (hasMatchingChild) {
             result.add(task.id);
-          } else if (filterAssignee === 'all' && filterPriority === 'all') {
-            // No assignee/priority filter, check other filters
+          } else if (filterAssignee === 'all' && filterPriority === 'all' && filterTeam === 'all') {
+            // No assignee/priority/team filter, check other filters
             if (taskMatchesFilters(task)) {
               result.add(task.id);
             }
@@ -937,7 +957,7 @@ export function GanttChart({ className }: GanttChartProps) {
     }
 
     return tasks.filter(task => result.has(task.id));
-  }, [tasks, taskMatchesFilters, filterAssignee, filterPriority]);
+  }, [tasks, taskMatchesFilters, filterAssignee, filterPriority, filterTeam]);
 
   // Statistics
   const stats = useMemo(() => {
@@ -1726,11 +1746,14 @@ export function GanttChart({ className }: GanttChartProps) {
               onAssigneeChange={setFilterAssignee}
               filterPriority={filterPriority}
               onPriorityChange={setFilterPriority}
+              filterTeam={filterTeam}
+              onTeamChange={setFilterTeam}
               groupBy={groupBy}
               onGroupByChange={setGroupBy}
               showStats={showStats}
               onShowStatsChange={setShowStats}
               assignees={uniqueAssignees}
+              teams={uniqueTeams}
               className="mb-4"
             />
           )}
@@ -1860,7 +1883,7 @@ export function GanttChart({ className }: GanttChartProps) {
           )}
 
           {/* Filter Results Info */}
-          {(searchQuery || filterStatus !== 'all' || filterAssignee !== 'all' || filterPriority !== 'all') && tasks.length > 0 && (
+          {(searchQuery || filterStatus !== 'all' || filterAssignee !== 'all' || filterPriority !== 'all' || filterTeam !== 'all') && tasks.length > 0 && (
             <div className="flex items-center gap-2 mb-4 text-sm text-muted-foreground">
               <span>{filteredTasks.length}개 / 전체 {tasks.length}개</span>
               <Button
@@ -1871,6 +1894,7 @@ export function GanttChart({ className }: GanttChartProps) {
                   setFilterStatus('all');
                   setFilterAssignee('all');
                   setFilterPriority('all');
+                  setFilterTeam('all');
                 }}
                 className="h-6 text-xs"
               >
@@ -2168,7 +2192,7 @@ export function GanttChart({ className }: GanttChartProps) {
                                   <Tooltip>
                                     <TooltipTrigger asChild>
                                       <span className="flex-shrink-0 cursor-default">
-                                        {task.teamIcon && /^\p{Emoji}/u.test(task.teamIcon) ? (
+                                        {task.teamIcon && isValidEmoji(task.teamIcon) ? (
                                           <span className="text-sm">{task.teamIcon}</span>
                                         ) : (
                                           <div className={`w-4 h-4 rounded flex items-center justify-center text-[9px] font-bold border ${teamColor.bg} ${teamColor.text} ${teamColor.border}`}>

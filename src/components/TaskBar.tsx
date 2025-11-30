@@ -153,10 +153,8 @@ export function TaskBar({
         const newStartDate = new Date(originalStartDate.current);
         newStartDate.setDate(newStartDate.getDate() + deltaDays);
 
-        // Don't allow start date to go past end date (minimum 1 day)
-        const minDate = new Date(task.endDate);
-        minDate.setDate(minDate.getDate() - 1);
-        if (newStartDate < minDate) {
+        // Don't allow start date to go past end date (minimum 1 day duration)
+        if (newStartDate < task.endDate) {
           onDateChange(task.id, newStartDate, task.endDate);
           updateDragGuide(newStartDate, task.endDate);
         }
@@ -202,10 +200,8 @@ export function TaskBar({
         const newEndDate = new Date(originalEndDate.current);
         newEndDate.setDate(newEndDate.getDate() + deltaDays);
 
-        // Don't allow end date to go before start date (minimum 1 day)
-        const minDate = new Date(task.startDate);
-        minDate.setDate(minDate.getDate() + 1);
-        if (newEndDate > minDate) {
+        // Don't allow end date to go before start date (minimum 1 day duration)
+        if (newEndDate > task.startDate) {
           onDateChange(task.id, task.startDate, newEndDate);
           updateDragGuide(task.startDate, newEndDate);
         }

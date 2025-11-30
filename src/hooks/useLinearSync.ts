@@ -149,8 +149,16 @@ export function useLinearSync(options: UseLinearSyncOptions = {}) {
   const selectTeam = async (teamId: string) => {
     if (!apiKey) return;
 
-    setState(prev => ({ ...prev, isSyncing: true, selectedTeamId: teamId }));
+    // Clear previous cycle selection when changing teams
+    setState(prev => ({
+      ...prev,
+      isSyncing: true,
+      selectedTeamId: teamId,
+      selectedCycleId: null,
+      cycles: [],
+    }));
     localStorage.setItem('linear-selected-team-id', teamId);
+    localStorage.removeItem('linear-selected-cycle-id');
 
     try {
       const cycles = await fetchLinearCycles(apiKey, teamId);
@@ -160,10 +168,10 @@ export function useLinearSync(options: UseLinearSyncOptions = {}) {
         isSyncing: false,
       }));
 
-      // If cycle was previously selected, auto-select it
-      const savedCycleId = localStorage.getItem('linear-selected-cycle-id');
-      if (savedCycleId && cycles.some(c => c.id === savedCycleId)) {
-        await selectCycle(savedCycleId);
+      // Auto-select the first active cycle (not completed)
+      const activeCycle = cycles.find(c => !c.completedAt);
+      if (activeCycle) {
+        await selectCycle(activeCycle.id);
       }
     } catch (error) {
       setState(prev => ({ ...prev, isSyncing: false }));

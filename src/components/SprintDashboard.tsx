@@ -14,7 +14,6 @@ import { SprintTaskForm } from './SprintTaskForm';
 import { BurndownChart } from './BurndownChart';
 import { GanttChart, Task } from './GanttChart';
 import { LinearSprintSync } from './LinearSprintSync';
-import { LinearRealtimeSync } from './LinearRealtimeSync';
 import { LinearCycleManager } from './LinearCycleManager';
 import { BacklogPanel } from './BacklogPanel';
 import { VelocityChart } from './VelocityChart';
@@ -630,39 +629,6 @@ export function SprintDashboard() {
               sprints={sprints}
               sprintTasks={sprintTasks}
               ganttTasks={ganttTasks}
-            />
-            <LinearRealtimeSync
-              onSyncComplete={(syncedSprints, syncedTasks) => {
-                if (syncedSprints.length > 0) {
-                  setSprints(prev => {
-                    const existingIds = new Set(prev.map(s => s.id));
-                    const newSprints = syncedSprints.filter(s => !existingIds.has(s.id));
-                    return [...prev.map(s => {
-                      const updated = syncedSprints.find(ns => ns.id === s.id);
-                      return updated || s;
-                    }), ...newSprints];
-                  });
-                }
-                if (syncedTasks.length > 0) {
-                  setSprintTasks(prev => {
-                    // Only replace tasks that match by ID or linearIssueId
-                    const syncedLinearIds = new Set(syncedTasks.map(t => t.linearIssueId).filter(Boolean));
-                    const syncedIds = new Set(syncedTasks.map(t => t.id));
-
-                    // Keep tasks that are not being synced (different cycle or non-Linear tasks)
-                    const unchanged = prev.filter(t => {
-                      // If task has linearIssueId, check if it's being synced
-                      if (t.linearIssueId) {
-                        return !syncedLinearIds.has(t.linearIssueId);
-                      }
-                      // For non-Linear tasks, keep if ID doesn't match
-                      return !syncedIds.has(t.id);
-                    });
-
-                    return [...unchanged, ...syncedTasks];
-                  });
-                }
-              }}
             />
             <LinearSprintSync
               sprints={sprints}

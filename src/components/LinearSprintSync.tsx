@@ -587,21 +587,36 @@ export function LinearSprintSync({
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto">
-            {/* Connection Status */}
-            {!isValidKey ? (
-              <div className="flex flex-col items-center justify-center py-8 text-center">
-                <AlertCircle className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                <p className="text-sm font-medium text-muted-foreground mb-2">
-                  Linear에 연결되지 않음
-                </p>
-                <p className="text-xs text-muted-foreground/70 mb-4">
-                  헤더의 <strong>"Linear 연결"</strong> 버튼을 눌러 API 키를 입력하세요
-                </p>
-                <p className="text-[10px] text-muted-foreground/50">
-                  Linear 설정 → API → Personal API keys에서 키를 생성할 수 있습니다
-                </p>
+            {/* API Key Input */}
+            <div className="space-y-2 mb-4">
+              <Label htmlFor="apiKey">Linear API Key</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="apiKey"
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder="lin_api_..."
+                  className="flex-1"
+                />
+                {isValidKey ? (
+                  <Badge variant="default" className="gap-1 shrink-0">
+                    <Check className="h-3 w-3" />
+                    연결됨
+                  </Badge>
+                ) : apiKey.length > 0 ? (
+                  <Badge variant="destructive" className="gap-1 shrink-0">
+                    <AlertCircle className="h-3 w-3" />
+                    무효
+                  </Badge>
+                ) : null}
               </div>
-            ) : (
+              <p className="text-[10px] text-muted-foreground">
+                Linear Settings → API → Personal API keys
+              </p>
+            </div>
+
+            {isValidKey ? (
               <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
                 <TabsList className="grid w-full grid-cols-3">
                   <TabsTrigger value="import" className="gap-1">
@@ -983,6 +998,13 @@ export function LinearSprintSync({
                   </div>
                 </TabsContent>
               </Tabs>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <AlertCircle className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                <p className="text-sm text-muted-foreground">
+                  유효한 API 키를 입력하세요
+                </p>
+              </div>
             )}
           </div>
         </DialogContent>

@@ -339,6 +339,29 @@ export function LinearSprintSync({
     }
   };
 
+  // Auto-sync polling (every 30 seconds when enabled)
+  useEffect(() => {
+    // Load auto-sync setting from localStorage
+    const savedAutoSync = localStorage.getItem('linear-auto-sync') === 'true';
+    setAutoSync(savedAutoSync);
+  }, []);
+
+  useEffect(() => {
+    if (!autoSync || !isValidKey || linkedSprints.length === 0) return;
+
+    // Initial sync on mount
+    handleSyncAllFromLinear();
+
+    // Set up polling interval (30 seconds)
+    const intervalId = setInterval(() => {
+      if (!isSyncing) {
+        handleSyncAllFromLinear();
+      }
+    }, 30000);
+
+    return () => clearInterval(intervalId);
+  }, [autoSync, isValidKey, linkedSprints.length]);
+
   // Push task status changes to Linear
   const handlePushToLinear = async (task: SprintTask) => {
     if (!task.linearIssueId || !isValidKey) return;

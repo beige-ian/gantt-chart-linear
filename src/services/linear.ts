@@ -476,68 +476,85 @@ export async function fetchLinearCycleIssues(
   apiKey: string,
   cycleId: string
 ): Promise<LinearIssue[]> {
-  const query = `{
-    cycle(id: "${cycleId}") {
-      issues(first: 250) {
-        nodes {
-          id
-          title
-          state {
-            id
-            name
-            type
+  const allIssues: any[] = [];
+  let hasNextPage = true;
+  let cursor: string | null = null;
+
+  while (hasNextPage) {
+    const afterClause = cursor ? `, after: "${cursor}"` : '';
+    const query = `{
+      cycle(id: "${cycleId}") {
+        issues(first: 100${afterClause}) {
+          pageInfo {
+            hasNextPage
+            endCursor
           }
-          priority
-          dueDate
-          createdAt
-          startedAt
-          estimate
-          project {
-            id
-            name
-          }
-          cycle {
-            id
-            name
-          }
-          team {
-            id
-            name
-            icon
-          }
-          assignee {
-            id
-            name
-            displayName
-            avatarUrl
-          }
-          labels {
-            nodes {
-              id
-              name
-              color
-            }
-          }
-          parent {
+          nodes {
             id
             title
-          }
-          relations {
-            nodes {
+            state {
+              id
+              name
               type
-              relatedIssue {
+            }
+            priority
+            dueDate
+            createdAt
+            startedAt
+            updatedAt
+            estimate
+            project {
+              id
+              name
+            }
+            cycle {
+              id
+              name
+            }
+            team {
+              id
+              name
+              icon
+            }
+            assignee {
+              id
+              name
+              displayName
+              avatarUrl
+            }
+            labels {
+              nodes {
                 id
+                name
+                color
+              }
+            }
+            parent {
+              id
+              title
+            }
+            relations {
+              nodes {
+                type
+                relatedIssue {
+                  id
+                }
               }
             }
           }
         }
       }
-    }
-  }`;
+    }`;
 
-  const data = await linearQuery(apiKey, query);
-  const issues = data.cycle?.issues?.nodes || [];
-  return issues.map((issue: any) => ({
+    const data = await linearQuery(apiKey, query);
+    const issues = data.cycle?.issues?.nodes || [];
+    allIssues.push(...issues);
+
+    hasNextPage = data.cycle?.issues?.pageInfo?.hasNextPage || false;
+    cursor = data.cycle?.issues?.pageInfo?.endCursor || null;
+  }
+
+  return allIssues.map((issue: any) => ({
     ...issue,
     stateType: issue.state?.type,
     relations: issue.relations?.nodes || [],

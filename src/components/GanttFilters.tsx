@@ -148,25 +148,25 @@ export function GanttFilters({
   const getStatusButtonText = () => {
     if (filterStatuses.length === 0) return '상태';
     if (filterStatuses.length === 1) return STATUS_CONFIG[filterStatuses[0]].label;
-    return `상태 (${filterStatuses.length})`;
+    return `상태 ${filterStatuses.length}개`;
   };
 
   const getPriorityButtonText = () => {
     if (filterPriorities.length === 0) return '우선순위';
     if (filterPriorities.length === 1) return PRIORITY_CONFIG[filterPriorities[0]]?.label;
-    return `우선순위 (${filterPriorities.length})`;
+    return `우선순위 ${filterPriorities.length}개`;
   };
 
   const getAssigneeButtonText = () => {
     if (filterAssignees.length === 0) return '담당자';
     if (filterAssignees.length === 1) return filterAssignees[0] === 'unassigned' ? '미지정' : filterAssignees[0];
-    return `담당자 (${filterAssignees.length})`;
+    return `담당자 ${filterAssignees.length}명`;
   };
 
   const getTeamButtonText = () => {
     if (filterTeams.length === 0) return '팀';
     if (filterTeams.length === 1) return filterTeams[0];
-    return `팀 (${filterTeams.length})`;
+    return `팀 ${filterTeams.length}개`;
   };
 
   return (
@@ -335,30 +335,50 @@ export function GanttFilters({
       </div>
 
       {hasActiveFilters && (
-        <div className="flex items-center gap-1 flex-wrap">
+        <div className="flex items-center gap-1.5 flex-wrap">
           {searchQuery && (
-            <Badge variant="secondary" className="h-5 gap-0.5 pl-1.5 pr-0.5 text-[11px] font-normal cursor-pointer hover:bg-accent/80" onClick={() => onSearchChange('')}>
-              <Search className="h-2.5 w-2.5" />"{searchQuery}"<X className="h-2.5 w-2.5" />
+            <Badge variant="outline" className="h-6 gap-1.5 pl-2 pr-1 text-xs font-medium bg-muted/50 border-border/60 cursor-pointer hover:bg-muted transition-colors group" onClick={() => onSearchChange('')}>
+              <Search className="h-3 w-3 text-muted-foreground" />
+              <span className="text-foreground">"{searchQuery}"</span>
+              <span className="h-4 w-4 rounded-full bg-muted-foreground/20 flex items-center justify-center group-hover:bg-destructive/20 transition-colors">
+                <X className="h-2.5 w-2.5 text-muted-foreground group-hover:text-destructive" />
+              </span>
             </Badge>
           )}
           {filterStatuses.map(status => (
-            <Badge key={status} variant="secondary" className={cn('h-5 gap-0.5 pl-1.5 pr-0.5 text-[11px] font-normal cursor-pointer hover:bg-accent/80', STATUS_CONFIG[status].color)} onClick={() => toggleStatus(status)}>
-              {STATUS_CONFIG[status].icon}{STATUS_CONFIG[status].label}<X className="h-2.5 w-2.5" />
+            <Badge key={status} variant="outline" className="h-6 gap-1.5 pl-2 pr-1 text-xs font-medium bg-muted/50 border-border/60 cursor-pointer hover:bg-muted transition-colors group" onClick={() => toggleStatus(status)}>
+              {STATUS_CONFIG[status].icon}
+              <span className={STATUS_CONFIG[status].color}>{STATUS_CONFIG[status].label}</span>
+              <span className="h-4 w-4 rounded-full bg-muted-foreground/20 flex items-center justify-center group-hover:bg-destructive/20 transition-colors">
+                <X className="h-2.5 w-2.5 text-muted-foreground group-hover:text-destructive" />
+              </span>
             </Badge>
           ))}
           {filterPriorities.map(priority => (
-            <Badge key={priority} variant="secondary" className="h-5 gap-0.5 pl-1.5 pr-0.5 text-[11px] font-normal cursor-pointer hover:bg-accent/80" onClick={() => togglePriority(priority)}>
-              <span className={cn('w-1.5 h-1.5 rounded-full', PRIORITY_CONFIG[priority]?.dotColor)} />{PRIORITY_CONFIG[priority]?.label}<X className="h-2.5 w-2.5" />
+            <Badge key={priority} variant="outline" className="h-6 gap-1.5 pl-2 pr-1 text-xs font-medium bg-muted/50 border-border/60 cursor-pointer hover:bg-muted transition-colors group" onClick={() => togglePriority(priority)}>
+              <span className={cn('w-2 h-2 rounded-full', PRIORITY_CONFIG[priority]?.dotColor)} />
+              <span className="text-foreground">{PRIORITY_CONFIG[priority]?.label}</span>
+              <span className="h-4 w-4 rounded-full bg-muted-foreground/20 flex items-center justify-center group-hover:bg-destructive/20 transition-colors">
+                <X className="h-2.5 w-2.5 text-muted-foreground group-hover:text-destructive" />
+              </span>
             </Badge>
           ))}
           {filterAssignees.map(assignee => (
-            <Badge key={assignee} variant="secondary" className="h-5 gap-0.5 pl-1.5 pr-0.5 text-[11px] font-normal cursor-pointer hover:bg-accent/80" onClick={() => toggleAssignee(assignee)}>
-              <User className="h-2.5 w-2.5" />{assignee === 'unassigned' ? '미지정' : assignee}<X className="h-2.5 w-2.5" />
+            <Badge key={assignee} variant="outline" className="h-6 gap-1.5 pl-2 pr-1 text-xs font-medium bg-muted/50 border-border/60 cursor-pointer hover:bg-muted transition-colors group" onClick={() => toggleAssignee(assignee)}>
+              <User className="h-3 w-3 text-muted-foreground" />
+              <span className="text-foreground">{assignee === 'unassigned' ? '미지정' : assignee}</span>
+              <span className="h-4 w-4 rounded-full bg-muted-foreground/20 flex items-center justify-center group-hover:bg-destructive/20 transition-colors">
+                <X className="h-2.5 w-2.5 text-muted-foreground group-hover:text-destructive" />
+              </span>
             </Badge>
           ))}
           {filterTeams.map(team => (
-            <Badge key={team} variant="secondary" className="h-5 gap-0.5 pl-1.5 pr-0.5 text-[11px] font-normal cursor-pointer hover:bg-accent/80" onClick={() => toggleTeam(team)}>
-              <Users className="h-2.5 w-2.5" />{team}<X className="h-2.5 w-2.5" />
+            <Badge key={team} variant="outline" className="h-6 gap-1.5 pl-2 pr-1 text-xs font-medium bg-muted/50 border-border/60 cursor-pointer hover:bg-muted transition-colors group" onClick={() => toggleTeam(team)}>
+              <Users className="h-3 w-3 text-muted-foreground" />
+              <span className="text-foreground">{team}</span>
+              <span className="h-4 w-4 rounded-full bg-muted-foreground/20 flex items-center justify-center group-hover:bg-destructive/20 transition-colors">
+                <X className="h-2.5 w-2.5 text-muted-foreground group-hover:text-destructive" />
+              </span>
             </Badge>
           ))}
         </div>

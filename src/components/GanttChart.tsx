@@ -1966,7 +1966,7 @@ export function GanttChart({ className }: GanttChartProps) {
           )}
 
           {/* Filter Results Info */}
-          {(searchQuery || filterStatus !== 'all' || filterAssignee !== 'all' || filterPriority !== 'all' || filterTeam !== 'all') && tasks.length > 0 && (
+          {(searchQuery || filterStatuses.length > 0 || filterAssignees.length > 0 || filterPriorities.length > 0 || filterTeams.length > 0) && tasks.length > 0 && (
             <div className="flex items-center gap-2 mb-4 text-sm text-muted-foreground">
               <span>{filteredTasks.length}개 / 전체 {tasks.length}개</span>
               <Button
@@ -1974,10 +1974,10 @@ export function GanttChart({ className }: GanttChartProps) {
                 size="sm"
                 onClick={() => {
                   setSearchQuery('');
-                  setFilterStatus('all');
-                  setFilterAssignee('all');
-                  setFilterPriority('all');
-                  setFilterTeam('all');
+                  setFilterStatuses([]);
+                  setFilterAssignees([]);
+                  setFilterPriorities([]);
+                  setFilterTeams([]);
                 }}
                 className="h-6 text-xs"
               >

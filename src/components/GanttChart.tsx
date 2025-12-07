@@ -691,10 +691,10 @@ export function GanttChart({ className }: GanttChartProps) {
   const [importedProjectIds, setImportedProjectIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState<GanttStatusFilter>('all');
-  const [filterAssignee, setFilterAssignee] = useState<string>('all');
-  const [filterPriority, setFilterPriority] = useState<string>('all');
-  const [filterTeam, setFilterTeam] = useState<string>('all');
+  const [filterStatuses, setFilterStatuses] = useState<GanttStatusFilter[]>([]);
+  const [filterAssignees, setFilterAssignees] = useState<string[]>([]);
+  const [filterPriorities, setFilterPriorities] = useState<string[]>([]);
+  const [filterTeams, setFilterTeams] = useState<string[]>([]);
   const [groupBy, setGroupBy] = useState<GanttGroupBy>('none');
   const [showStats, setShowStats] = useState(false);
   const [ganttSettings, setGanttSettings] = useState<GanttSettingsData>(defaultSettings);
@@ -948,24 +948,25 @@ export function GanttChart({ className }: GanttChartProps) {
     if (searchQuery && !task.name.toLowerCase().includes(searchQuery.toLowerCase())) {
       return false;
     }
-    // Status filter
-    if (filterStatus === 'completed' && task.progress !== 100) return false;
-    if (filterStatus === 'in-progress' && (task.progress === 0 || task.progress === 100)) return false;
-    if (filterStatus === 'not-started' && task.progress !== 0) return false;
-    // Assignee filter - only apply to tasks with parentId (issues), not projects
-    if (filterAssignee !== 'all' && task.parentId) {
-      if (filterAssignee === 'unassigned') {
-        if (task.assignee) return false;
-      } else if (task.assignee !== filterAssignee) {
-        return false;
+    // Status filter - multi-select
+    if (filterStatuses.length > 0) {
+      const taskStatus = task.progress === 100 ? 'completed' : task.progress === 0 ? 'not-started' : 'in-progress';
+      if (!filterStatuses.includes(taskStatus as GanttStatusFilter)) return false;
+    }
+    // Assignee filter - multi-select
+    if (filterAssignees.length > 0 && task.parentId) {
+      if (filterAssignees.includes('unassigned')) {
+        if (task.assignee && !filterAssignees.includes(task.assignee)) return false;
+      } else {
+        if (!task.assignee || !filterAssignees.includes(task.assignee)) return false;
       }
     }
-    // Priority filter - only apply to tasks with parentId (issues)
-    if (filterPriority !== 'all' && task.parentId && task.priority !== filterPriority) return false;
-    // Team filter - only apply to tasks with parentId (issues)
-    if (filterTeam !== 'all' && task.parentId && task.teamName !== filterTeam) return false;
+    // Priority filter - multi-select
+    if (filterPriorities.length > 0 && task.parentId && (!task.priority || !filterPriorities.includes(task.priority))) return false;
+    // Team filter - multi-select
+    if (filterTeams.length > 0 && task.parentId && (!task.teamName || !filterTeams.includes(task.teamName))) return false;
     return true;
-  }, [searchQuery, filterStatus, filterAssignee, filterPriority, filterTeam]);
+  }, [searchQuery, filterStatuses, filterAssignees, filterPriorities, filterTeams]);
 
   // Filter tasks based on search and filters
   // Include parent tasks if any of their children match
@@ -982,7 +983,7 @@ export function GanttChart({ className }: GanttChartProps) {
     const result = new Set<string>(directMatches);
 
     // For assignee/priority/team filters, include projects that have matching children
-    if (filterAssignee !== 'all' || filterPriority !== 'all' || filterTeam !== 'all') {
+    if (filterAssignees.length > 0 || filterPriorities.length > 0 || filterTeams.length > 0) {
       tasks.forEach(task => {
         if (!task.parentId) {
           // This is a project - check if any children match
@@ -991,7 +992,7 @@ export function GanttChart({ className }: GanttChartProps) {
           );
           if (hasMatchingChild) {
             result.add(task.id);
-          } else if (filterAssignee === 'all' && filterPriority === 'all' && filterTeam === 'all') {
+          } else if (filterAssignees.length === 0 && filterPriorities.length === 0 && filterTeams.length === 0) {
             // No assignee/priority/team filter, check other filters
             if (taskMatchesFilters(task)) {
               result.add(task.id);
@@ -1002,7 +1003,7 @@ export function GanttChart({ className }: GanttChartProps) {
     }
 
     return tasks.filter(task => result.has(task.id));
-  }, [tasks, taskMatchesFilters, filterAssignee, filterPriority, filterTeam]);
+  }, [tasks, taskMatchesFilters, filterAssignees, filterPriorities, filterTeams]);
 
   // Statistics
   const stats = useMemo(() => {
@@ -1822,14 +1823,14 @@ export function GanttChart({ className }: GanttChartProps) {
             <GanttFilters
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
-              filterStatus={filterStatus}
-              onStatusChange={setFilterStatus}
-              filterAssignee={filterAssignee}
-              onAssigneeChange={setFilterAssignee}
-              filterPriority={filterPriority}
-              onPriorityChange={setFilterPriority}
-              filterTeam={filterTeam}
-              onTeamChange={setFilterTeam}
+              filterStatuses={filterStatuses}
+              onStatusesChange={setFilterStatuses}
+              filterAssignees={filterAssignees}
+              onAssigneesChange={setFilterAssignees}
+              filterPriorities={filterPriorities}
+              onPrioritiesChange={setFilterPriorities}
+              filterTeams={filterTeams}
+              onTeamsChange={setFilterTeams}
               groupBy={groupBy}
               onGroupByChange={setGroupBy}
               showStats={showStats}

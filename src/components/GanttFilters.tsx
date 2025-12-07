@@ -4,7 +4,6 @@ import { Badge } from './ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuCheckboxItem,
   DropdownMenuSeparator,
@@ -39,23 +38,24 @@ import {
   Layers,
   BarChart3,
   CircleDashed,
+  Check,
 } from 'lucide-react';
 import { cn } from './ui/utils';
 
-export type GanttStatusFilter = 'all' | 'completed' | 'in-progress' | 'not-started';
+export type GanttStatusFilter = 'completed' | 'in-progress' | 'not-started';
 export type GanttGroupBy = 'none' | 'assignee' | 'priority' | 'team' | 'status';
 
 interface GanttFiltersProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
-  filterStatus: GanttStatusFilter;
-  onStatusChange: (status: GanttStatusFilter) => void;
-  filterAssignee: string;
-  onAssigneeChange: (assignee: string) => void;
-  filterPriority: string;
-  onPriorityChange: (priority: string) => void;
-  filterTeam: string;
-  onTeamChange: (team: string) => void;
+  filterStatuses: GanttStatusFilter[];
+  onStatusesChange: (statuses: GanttStatusFilter[]) => void;
+  filterAssignees: string[];
+  onAssigneesChange: (assignees: string[]) => void;
+  filterPriorities: string[];
+  onPrioritiesChange: (priorities: string[]) => void;
+  filterTeams: string[];
+  onTeamsChange: (teams: string[]) => void;
   groupBy: GanttGroupBy;
   onGroupByChange: (groupBy: GanttGroupBy) => void;
   showStats: boolean;
@@ -65,17 +65,13 @@ interface GanttFiltersProps {
   className?: string;
 }
 
-// Status icons
 const STATUS_CONFIG: Record<GanttStatusFilter, { icon: React.ReactNode; label: string; color?: string }> = {
-  all: { icon: <Circle className="h-3.5 w-3.5" />, label: '전체' },
   completed: { icon: <CheckCircle2 className="h-3.5 w-3.5 text-status-done" />, label: '완료', color: 'text-status-done' },
   'in-progress': { icon: <Timer className="h-3.5 w-3.5 text-status-in-progress" />, label: '진행중', color: 'text-status-in-progress' },
   'not-started': { icon: <CircleDashed className="h-3.5 w-3.5 text-muted-foreground" />, label: '시작전', color: 'text-muted-foreground' },
 };
 
-// Priority config
 const PRIORITY_CONFIG: Record<string, { icon: React.ReactNode; label: string; dotColor: string }> = {
-  all: { icon: <Signal className="h-3.5 w-3.5" />, label: '전체', dotColor: '' },
   urgent: { icon: <Zap className="h-3.5 w-3.5 text-red-500" />, label: '긴급', dotColor: 'bg-red-500' },
   high: { icon: <SignalHigh className="h-3.5 w-3.5 text-orange-500" />, label: '높음', dotColor: 'bg-orange-500' },
   medium: { icon: <Signal className="h-3.5 w-3.5 text-yellow-500" />, label: '보통', dotColor: 'bg-yellow-500' },
@@ -83,7 +79,6 @@ const PRIORITY_CONFIG: Record<string, { icon: React.ReactNode; label: string; do
   none: { icon: <SignalZero className="h-3.5 w-3.5 text-muted-foreground" />, label: '없음', dotColor: 'bg-gray-400' },
 };
 
-// Group by config
 const GROUP_CONFIG: Record<GanttGroupBy, { icon: React.ReactNode; label: string }> = {
   none: { icon: <Layers className="h-3.5 w-3.5" />, label: '그룹 없음' },
   assignee: { icon: <User className="h-3.5 w-3.5" />, label: '담당자별' },
@@ -93,170 +88,150 @@ const GROUP_CONFIG: Record<GanttGroupBy, { icon: React.ReactNode; label: string 
 };
 
 export function GanttFilters({
-  searchQuery,
-  onSearchChange,
-  filterStatus,
-  onStatusChange,
-  filterAssignee,
-  onAssigneeChange,
-  filterPriority,
-  onPriorityChange,
-  filterTeam,
-  onTeamChange,
-  groupBy,
-  onGroupByChange,
-  showStats,
-  onShowStatsChange,
-  assignees,
-  teams,
-  className,
+  searchQuery, onSearchChange,
+  filterStatuses, onStatusesChange,
+  filterAssignees, onAssigneesChange,
+  filterPriorities, onPrioritiesChange,
+  filterTeams, onTeamsChange,
+  groupBy, onGroupByChange,
+  showStats, onShowStatsChange,
+  assignees, teams, className,
 }: GanttFiltersProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [assigneeOpen, setAssigneeOpen] = useState(false);
   const [teamOpen, setTeamOpen] = useState(false);
 
-  // Check if any filters are active
+  const toggleStatus = (status: GanttStatusFilter) => {
+    if (filterStatuses.includes(status)) {
+      onStatusesChange(filterStatuses.filter(s => s !== status));
+    } else {
+      onStatusesChange([...filterStatuses, status]);
+    }
+  };
+
+  const togglePriority = (priority: string) => {
+    if (filterPriorities.includes(priority)) {
+      onPrioritiesChange(filterPriorities.filter(p => p !== priority));
+    } else {
+      onPrioritiesChange([...filterPriorities, priority]);
+    }
+  };
+
+  const toggleAssignee = (assignee: string) => {
+    if (filterAssignees.includes(assignee)) {
+      onAssigneesChange(filterAssignees.filter(a => a !== assignee));
+    } else {
+      onAssigneesChange([...filterAssignees, assignee]);
+    }
+  };
+
+  const toggleTeam = (team: string) => {
+    if (filterTeams.includes(team)) {
+      onTeamsChange(filterTeams.filter(t => t !== team));
+    } else {
+      onTeamsChange([...filterTeams, team]);
+    }
+  };
+
   const hasActiveFilters = useMemo(() => {
-    return searchQuery || filterStatus !== 'all' || filterAssignee !== 'all' || filterPriority !== 'all' || filterTeam !== 'all';
-  }, [searchQuery, filterStatus, filterAssignee, filterPriority, filterTeam]);
+    return searchQuery || filterStatuses.length > 0 || filterAssignees.length > 0 || filterPriorities.length > 0 || filterTeams.length > 0;
+  }, [searchQuery, filterStatuses, filterAssignees, filterPriorities, filterTeams]);
 
   const clearAllFilters = () => {
     onSearchChange('');
-    onStatusChange('all');
-    onAssigneeChange('all');
-    onPriorityChange('all');
-    onTeamChange('all');
+    onStatusesChange([]);
+    onAssigneesChange([]);
+    onPrioritiesChange([]);
+    onTeamsChange([]);
+  };
+
+  const getStatusButtonText = () => {
+    if (filterStatuses.length === 0) return '상태';
+    if (filterStatuses.length === 1) return STATUS_CONFIG[filterStatuses[0]].label;
+    return `상태 (${filterStatuses.length})`;
+  };
+
+  const getPriorityButtonText = () => {
+    if (filterPriorities.length === 0) return '우선순위';
+    if (filterPriorities.length === 1) return PRIORITY_CONFIG[filterPriorities[0]]?.label;
+    return `우선순위 (${filterPriorities.length})`;
+  };
+
+  const getAssigneeButtonText = () => {
+    if (filterAssignees.length === 0) return '담당자';
+    if (filterAssignees.length === 1) return filterAssignees[0] === 'unassigned' ? '미지정' : filterAssignees[0];
+    return `담당자 (${filterAssignees.length})`;
+  };
+
+  const getTeamButtonText = () => {
+    if (filterTeams.length === 0) return '팀';
+    if (filterTeams.length === 1) return filterTeams[0];
+    return `팀 (${filterTeams.length})`;
   };
 
   return (
     <div className={cn('space-y-1.5', className)}>
-      {/* Filter Bar */}
       <div className="flex items-center gap-1 flex-wrap">
-        {/* Search */}
         <Popover open={searchOpen} onOpenChange={setSearchOpen}>
           <PopoverTrigger asChild>
-            <Button
-              variant={searchQuery ? 'secondary' : 'ghost'}
-              size="sm"
-              className={cn(
-                'h-7 gap-1 text-xs font-normal',
-                searchQuery && 'bg-accent'
-              )}
-            >
+            <Button variant={searchQuery ? 'secondary' : 'ghost'} size="sm" className={cn('h-7 gap-1 text-xs font-normal', searchQuery && 'bg-accent')}>
               <Search className="h-3.5 w-3.5" />
-              {searchQuery ? (
-                <span className="max-w-[80px] truncate">{searchQuery}</span>
-              ) : (
-                '검색'
-              )}
+              {searchQuery ? <span className="max-w-[80px] truncate">{searchQuery}</span> : '검색'}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-64 p-2" align="start">
             <div className="flex items-center gap-2">
               <Search className="h-4 w-4 text-muted-foreground shrink-0" />
-              <input
-                type="text"
-                className="flex-1 bg-transparent border-none outline-none text-sm placeholder:text-muted-foreground"
-                placeholder="태스크 검색..."
-                value={searchQuery}
-                onChange={(e) => onSearchChange(e.target.value)}
-                autoFocus
-              />
-              {searchQuery && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-5 w-5 shrink-0"
-                  onClick={() => onSearchChange('')}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              )}
+              <input type="text" className="flex-1 bg-transparent border-none outline-none text-sm placeholder:text-muted-foreground" placeholder="태스크 검색..." value={searchQuery} onChange={(e) => onSearchChange(e.target.value)} autoFocus />
+              {searchQuery && <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => onSearchChange('')}><X className="h-3 w-3" /></Button>}
             </div>
           </PopoverContent>
         </Popover>
 
-        {/* Status Filter */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button
-              variant={filterStatus !== 'all' ? 'secondary' : 'ghost'}
-              size="sm"
-              className={cn(
-                'h-7 gap-1 text-xs font-normal',
-                filterStatus !== 'all' && 'bg-accent'
-              )}
-            >
-              {STATUS_CONFIG[filterStatus].icon}
-              {filterStatus === 'all' ? '상태' : STATUS_CONFIG[filterStatus].label}
+            <Button variant={filterStatuses.length > 0 ? 'secondary' : 'ghost'} size="sm" className={cn('h-7 gap-1 text-xs font-normal', filterStatuses.length > 0 && 'bg-accent')}>
+              {filterStatuses.length === 1 ? STATUS_CONFIG[filterStatuses[0]].icon : <Circle className="h-3.5 w-3.5" />}
+              {getStatusButtonText()}
               <ChevronDown className="h-3 w-3 opacity-50" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-36">
-            {(['all', 'completed', 'in-progress', 'not-started'] as const).map((status) => (
-              <DropdownMenuItem
-                key={status}
-                onClick={() => onStatusChange(status)}
-                className={cn('gap-2', filterStatus === status && 'bg-accent')}
-              >
+          <DropdownMenuContent align="start" className="w-40">
+            {(['completed', 'in-progress', 'not-started'] as const).map((status) => (
+              <DropdownMenuCheckboxItem key={status} checked={filterStatuses.includes(status)} onCheckedChange={() => toggleStatus(status)} className="gap-2">
                 {STATUS_CONFIG[status].icon}
                 <span>{STATUS_CONFIG[status].label}</span>
-              </DropdownMenuItem>
+              </DropdownMenuCheckboxItem>
             ))}
+            {filterStatuses.length > 0 && (<><DropdownMenuSeparator /><DropdownMenuCheckboxItem checked={false} onCheckedChange={() => onStatusesChange([])} className="text-muted-foreground">초기화</DropdownMenuCheckboxItem></>)}
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* Priority Filter */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button
-              variant={filterPriority !== 'all' ? 'secondary' : 'ghost'}
-              size="sm"
-              className={cn(
-                'h-7 gap-1 text-xs font-normal',
-                filterPriority !== 'all' && 'bg-accent'
-              )}
-            >
-              {PRIORITY_CONFIG[filterPriority]?.icon || <Signal className="h-3.5 w-3.5" />}
-              {filterPriority === 'all' ? '우선순위' : PRIORITY_CONFIG[filterPriority]?.label}
+            <Button variant={filterPriorities.length > 0 ? 'secondary' : 'ghost'} size="sm" className={cn('h-7 gap-1 text-xs font-normal', filterPriorities.length > 0 && 'bg-accent')}>
+              {filterPriorities.length === 1 ? PRIORITY_CONFIG[filterPriorities[0]]?.icon : <Signal className="h-3.5 w-3.5" />}
+              {getPriorityButtonText()}
               <ChevronDown className="h-3 w-3 opacity-50" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-36">
-            {(['all', 'urgent', 'high', 'medium', 'low', 'none'] as const).map((priority) => (
-              <DropdownMenuItem
-                key={priority}
-                onClick={() => onPriorityChange(priority)}
-                className={cn('gap-2', filterPriority === priority && 'bg-accent')}
-              >
-                {priority !== 'all' && (
-                  <span className={cn('w-2 h-2 rounded-full', PRIORITY_CONFIG[priority].dotColor)} />
-                )}
-                {priority === 'all' && PRIORITY_CONFIG[priority].icon}
+          <DropdownMenuContent align="start" className="w-40">
+            {(['urgent', 'high', 'medium', 'low', 'none'] as const).map((priority) => (
+              <DropdownMenuCheckboxItem key={priority} checked={filterPriorities.includes(priority)} onCheckedChange={() => togglePriority(priority)} className="gap-2">
+                <span className={cn('w-2 h-2 rounded-full', PRIORITY_CONFIG[priority].dotColor)} />
                 <span>{PRIORITY_CONFIG[priority].label}</span>
-              </DropdownMenuItem>
+              </DropdownMenuCheckboxItem>
             ))}
+            {filterPriorities.length > 0 && (<><DropdownMenuSeparator /><DropdownMenuCheckboxItem checked={false} onCheckedChange={() => onPrioritiesChange([])} className="text-muted-foreground">초기화</DropdownMenuCheckboxItem></>)}
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* Assignee Filter */}
         {assignees.length > 0 && (
           <Popover open={assigneeOpen} onOpenChange={setAssigneeOpen}>
             <PopoverTrigger asChild>
-              <Button
-                variant={filterAssignee !== 'all' ? 'secondary' : 'ghost'}
-                size="sm"
-                className={cn(
-                  'h-7 gap-1 text-xs font-normal',
-                  filterAssignee !== 'all' && 'bg-accent'
-                )}
-              >
+              <Button variant={filterAssignees.length > 0 ? 'secondary' : 'ghost'} size="sm" className={cn('h-7 gap-1 text-xs font-normal', filterAssignees.length > 0 && 'bg-accent')}>
                 <User className="h-3.5 w-3.5" />
-                {filterAssignee === 'all' ? '담당자' : (
-                  filterAssignee === 'unassigned' ? '미지정' : (
-                    <span className="max-w-[60px] truncate">{filterAssignee}</span>
-                  )
-                )}
+                <span className="max-w-[80px] truncate">{getAssigneeButtonText()}</span>
                 <ChevronDown className="h-3 w-3 opacity-50" />
               </Button>
             </PopoverTrigger>
@@ -264,46 +239,26 @@ export function GanttFilters({
               <Command>
                 <CommandInput placeholder="담당자 검색..." className="h-8 text-xs" />
                 <CommandList>
-                  <CommandEmpty className="py-2 text-xs text-center">
-                    결과 없음
-                  </CommandEmpty>
+                  <CommandEmpty className="py-2 text-xs text-center">결과 없음</CommandEmpty>
                   <CommandGroup>
-                    <CommandItem
-                      onSelect={() => {
-                        onAssigneeChange('all');
-                        setAssigneeOpen(false);
-                      }}
-                      className={cn('gap-2 text-xs', filterAssignee === 'all' && 'bg-accent')}
-                    >
-                      <User className="h-3.5 w-3.5" />
-                      <span>전체 담당자</span>
-                    </CommandItem>
-                    <CommandItem
-                      onSelect={() => {
-                        onAssigneeChange('unassigned');
-                        setAssigneeOpen(false);
-                      }}
-                      className={cn('gap-2 text-xs', filterAssignee === 'unassigned' && 'bg-accent')}
-                    >
+                    <CommandItem onSelect={() => toggleAssignee('unassigned')} className="gap-2 text-xs">
+                      <div className={cn('h-4 w-4 border rounded flex items-center justify-center', filterAssignees.includes('unassigned') ? 'bg-primary border-primary' : 'border-input')}>
+                        {filterAssignees.includes('unassigned') && <Check className="h-3 w-3 text-primary-foreground" />}
+                      </div>
                       <Circle className="h-3.5 w-3.5 text-muted-foreground" />
                       <span>미지정</span>
                     </CommandItem>
                     <DropdownMenuSeparator />
                     {assignees.map((assignee) => (
-                      <CommandItem
-                        key={assignee}
-                        onSelect={() => {
-                          onAssigneeChange(assignee);
-                          setAssigneeOpen(false);
-                        }}
-                        className={cn('gap-2 text-xs', filterAssignee === assignee && 'bg-accent')}
-                      >
-                        <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-medium">
-                          {assignee.charAt(0).toUpperCase()}
+                      <CommandItem key={assignee} onSelect={() => toggleAssignee(assignee)} className="gap-2 text-xs">
+                        <div className={cn('h-4 w-4 border rounded flex items-center justify-center', filterAssignees.includes(assignee) ? 'bg-primary border-primary' : 'border-input')}>
+                          {filterAssignees.includes(assignee) && <Check className="h-3 w-3 text-primary-foreground" />}
                         </div>
+                        <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-medium">{assignee.charAt(0).toUpperCase()}</div>
                         <span className="truncate">{assignee}</span>
                       </CommandItem>
                     ))}
+                    {filterAssignees.length > 0 && (<><DropdownMenuSeparator /><CommandItem onSelect={() => { onAssigneesChange([]); setAssigneeOpen(false); }} className="gap-2 text-xs text-muted-foreground">초기화</CommandItem></>)}
                   </CommandGroup>
                 </CommandList>
               </Command>
@@ -311,22 +266,12 @@ export function GanttFilters({
           </Popover>
         )}
 
-        {/* Team Filter */}
         {teams.length > 0 && (
           <Popover open={teamOpen} onOpenChange={setTeamOpen}>
             <PopoverTrigger asChild>
-              <Button
-                variant={filterTeam !== 'all' ? 'secondary' : 'ghost'}
-                size="sm"
-                className={cn(
-                  'h-7 gap-1 text-xs font-normal',
-                  filterTeam !== 'all' && 'bg-accent'
-                )}
-              >
+              <Button variant={filterTeams.length > 0 ? 'secondary' : 'ghost'} size="sm" className={cn('h-7 gap-1 text-xs font-normal', filterTeams.length > 0 && 'bg-accent')}>
                 <Users className="h-3.5 w-3.5" />
-                {filterTeam === 'all' ? '팀' : (
-                  <span className="max-w-[60px] truncate">{filterTeam}</span>
-                )}
+                <span className="max-w-[80px] truncate">{getTeamButtonText()}</span>
                 <ChevronDown className="h-3 w-3 opacity-50" />
               </Button>
             </PopoverTrigger>
@@ -334,36 +279,18 @@ export function GanttFilters({
               <Command>
                 <CommandInput placeholder="팀 검색..." className="h-8 text-xs" />
                 <CommandList>
-                  <CommandEmpty className="py-2 text-xs text-center">
-                    결과 없음
-                  </CommandEmpty>
+                  <CommandEmpty className="py-2 text-xs text-center">결과 없음</CommandEmpty>
                   <CommandGroup>
-                    <CommandItem
-                      onSelect={() => {
-                        onTeamChange('all');
-                        setTeamOpen(false);
-                      }}
-                      className={cn('gap-2 text-xs', filterTeam === 'all' && 'bg-accent')}
-                    >
-                      <Users className="h-3.5 w-3.5" />
-                      <span>전체 팀</span>
-                    </CommandItem>
-                    <DropdownMenuSeparator />
                     {teams.map((team) => (
-                      <CommandItem
-                        key={team}
-                        onSelect={() => {
-                          onTeamChange(team);
-                          setTeamOpen(false);
-                        }}
-                        className={cn('gap-2 text-xs', filterTeam === team && 'bg-accent')}
-                      >
-                        <div className="h-5 w-5 rounded bg-primary/10 flex items-center justify-center text-[10px] font-bold">
-                          {team.charAt(0).toUpperCase()}
+                      <CommandItem key={team} onSelect={() => toggleTeam(team)} className="gap-2 text-xs">
+                        <div className={cn('h-4 w-4 border rounded flex items-center justify-center', filterTeams.includes(team) ? 'bg-primary border-primary' : 'border-input')}>
+                          {filterTeams.includes(team) && <Check className="h-3 w-3 text-primary-foreground" />}
                         </div>
+                        <div className="h-5 w-5 rounded bg-primary/10 flex items-center justify-center text-[10px] font-bold">{team.charAt(0).toUpperCase()}</div>
                         <span className="truncate">{team}</span>
                       </CommandItem>
                     ))}
+                    {filterTeams.length > 0 && (<><DropdownMenuSeparator /><CommandItem onSelect={() => { onTeamsChange([]); setTeamOpen(false); }} className="gap-2 text-xs text-muted-foreground">초기화</CommandItem></>)}
                   </CommandGroup>
                 </CommandList>
               </Command>
@@ -371,20 +298,11 @@ export function GanttFilters({
           </Popover>
         )}
 
-        {/* Divider */}
         <div className="h-3.5 w-px bg-border/50 mx-1" />
 
-        {/* Group By */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button
-              variant={groupBy !== 'none' ? 'secondary' : 'ghost'}
-              size="sm"
-              className={cn(
-                'h-7 gap-1 text-xs font-normal',
-                groupBy !== 'none' && 'bg-accent'
-              )}
-            >
+            <Button variant={groupBy !== 'none' ? 'secondary' : 'ghost'} size="sm" className={cn('h-7 gap-1 text-xs font-normal', groupBy !== 'none' && 'bg-accent')}>
               <Layers className="h-3.5 w-3.5" />
               {groupBy === 'none' ? '그룹' : GROUP_CONFIG[groupBy].label}
               <ChevronDown className="h-3 w-3 opacity-50" />
@@ -392,39 +310,23 @@ export function GanttFilters({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-36">
             {(['none', 'assignee', 'priority', 'team', 'status'] as const).map((group) => (
-              <DropdownMenuItem
-                key={group}
-                onClick={() => onGroupByChange(group)}
-                className={cn('gap-2', groupBy === group && 'bg-accent')}
-              >
+              <DropdownMenuCheckboxItem key={group} checked={groupBy === group} onCheckedChange={() => onGroupByChange(group)} className="gap-2">
                 {GROUP_CONFIG[group].icon}
                 <span>{GROUP_CONFIG[group].label}</span>
-              </DropdownMenuItem>
+              </DropdownMenuCheckboxItem>
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* Stats Toggle */}
-        <Button
-          variant={showStats ? 'secondary' : 'ghost'}
-          size="sm"
-          className="h-7 gap-1 text-xs font-normal"
-          onClick={() => onShowStatsChange(!showStats)}
-        >
+        <Button variant={showStats ? 'secondary' : 'ghost'} size="sm" className="h-7 gap-1 text-xs font-normal" onClick={() => onShowStatsChange(!showStats)}>
           <BarChart3 className="h-3.5 w-3.5" />
           통계
         </Button>
 
-        {/* Clear Filters */}
         {hasActiveFilters && (
           <>
             <div className="h-3.5 w-px bg-border/50 mx-1" />
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 text-xs font-normal text-muted-foreground hover:text-foreground"
-              onClick={clearAllFilters}
-            >
+            <Button variant="ghost" size="sm" className="h-7 text-xs font-normal text-muted-foreground hover:text-foreground" onClick={clearAllFilters}>
               <X className="h-3.5 w-3.5 mr-1" />
               초기화
             </Button>
@@ -432,67 +334,33 @@ export function GanttFilters({
         )}
       </div>
 
-      {/* Active Filter Chips */}
       {hasActiveFilters && (
         <div className="flex items-center gap-1 flex-wrap">
           {searchQuery && (
-            <Badge
-              variant="secondary"
-              className="h-5 gap-0.5 pl-1.5 pr-0.5 text-[11px] font-normal cursor-pointer hover:bg-accent/80"
-              onClick={() => onSearchChange('')}
-            >
-              <Search className="h-2.5 w-2.5" />
-              "{searchQuery}"
-              <X className="h-2.5 w-2.5" />
+            <Badge variant="secondary" className="h-5 gap-0.5 pl-1.5 pr-0.5 text-[11px] font-normal cursor-pointer hover:bg-accent/80" onClick={() => onSearchChange('')}>
+              <Search className="h-2.5 w-2.5" />"{searchQuery}"<X className="h-2.5 w-2.5" />
             </Badge>
           )}
-          {filterStatus !== 'all' && (
-            <Badge
-              variant="secondary"
-              className={cn(
-                'h-5 gap-0.5 pl-1.5 pr-0.5 text-[11px] font-normal cursor-pointer hover:bg-accent/80',
-                STATUS_CONFIG[filterStatus].color
-              )}
-              onClick={() => onStatusChange('all')}
-            >
-              {STATUS_CONFIG[filterStatus].icon}
-              {STATUS_CONFIG[filterStatus].label}
-              <X className="h-2.5 w-2.5" />
+          {filterStatuses.map(status => (
+            <Badge key={status} variant="secondary" className={cn('h-5 gap-0.5 pl-1.5 pr-0.5 text-[11px] font-normal cursor-pointer hover:bg-accent/80', STATUS_CONFIG[status].color)} onClick={() => toggleStatus(status)}>
+              {STATUS_CONFIG[status].icon}{STATUS_CONFIG[status].label}<X className="h-2.5 w-2.5" />
             </Badge>
-          )}
-          {filterPriority !== 'all' && (
-            <Badge
-              variant="secondary"
-              className="h-5 gap-0.5 pl-1.5 pr-0.5 text-[11px] font-normal cursor-pointer hover:bg-accent/80"
-              onClick={() => onPriorityChange('all')}
-            >
-              <span className={cn('w-1.5 h-1.5 rounded-full', PRIORITY_CONFIG[filterPriority]?.dotColor)} />
-              {PRIORITY_CONFIG[filterPriority]?.label}
-              <X className="h-2.5 w-2.5" />
+          ))}
+          {filterPriorities.map(priority => (
+            <Badge key={priority} variant="secondary" className="h-5 gap-0.5 pl-1.5 pr-0.5 text-[11px] font-normal cursor-pointer hover:bg-accent/80" onClick={() => togglePriority(priority)}>
+              <span className={cn('w-1.5 h-1.5 rounded-full', PRIORITY_CONFIG[priority]?.dotColor)} />{PRIORITY_CONFIG[priority]?.label}<X className="h-2.5 w-2.5" />
             </Badge>
-          )}
-          {filterAssignee !== 'all' && (
-            <Badge
-              variant="secondary"
-              className="h-5 gap-0.5 pl-1.5 pr-0.5 text-[11px] font-normal cursor-pointer hover:bg-accent/80"
-              onClick={() => onAssigneeChange('all')}
-            >
-              <User className="h-2.5 w-2.5" />
-              {filterAssignee === 'unassigned' ? '미지정' : filterAssignee}
-              <X className="h-2.5 w-2.5" />
+          ))}
+          {filterAssignees.map(assignee => (
+            <Badge key={assignee} variant="secondary" className="h-5 gap-0.5 pl-1.5 pr-0.5 text-[11px] font-normal cursor-pointer hover:bg-accent/80" onClick={() => toggleAssignee(assignee)}>
+              <User className="h-2.5 w-2.5" />{assignee === 'unassigned' ? '미지정' : assignee}<X className="h-2.5 w-2.5" />
             </Badge>
-          )}
-          {filterTeam !== 'all' && (
-            <Badge
-              variant="secondary"
-              className="h-5 gap-0.5 pl-1.5 pr-0.5 text-[11px] font-normal cursor-pointer hover:bg-accent/80"
-              onClick={() => onTeamChange('all')}
-            >
-              <Users className="h-2.5 w-2.5" />
-              {filterTeam}
-              <X className="h-2.5 w-2.5" />
+          ))}
+          {filterTeams.map(team => (
+            <Badge key={team} variant="secondary" className="h-5 gap-0.5 pl-1.5 pr-0.5 text-[11px] font-normal cursor-pointer hover:bg-accent/80" onClick={() => toggleTeam(team)}>
+              <Users className="h-2.5 w-2.5" />{team}<X className="h-2.5 w-2.5" />
             </Badge>
-          )}
+          ))}
         </div>
       )}
     </div>
